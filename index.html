@@ -1,0 +1,1392 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Basecamp Rental - Sistem Manajemen</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        * { box-sizing: border-box; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        [x-cloak] { display: none !important; }
+        .gradient-bg { background: linear-gradient(160deg, #0a1628 0%, #0f2027 50%, #1a3a2a 100%); }
+        .chart-bar { transition: height 0.8s cubic-bezier(.4,0,.2,1); }
+        .flow-line::before { content:''; position:absolute; left:24px; top:52px; bottom:0; width:2px; background:linear-gradient(to bottom,#10b981,transparent); }
+        .flow-line:last-child::before { display:none; }
+        ::-webkit-scrollbar { width:5px; height:5px; }
+        ::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:3px; }
+        .pulse-dot { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+        .modal-overlay { backdrop-filter: blur(4px); }
+        .slide-in { animation: slideIn .25s ease; }
+        @keyframes slideIn { from{opacity:0;transform:translateY(-12px)} to{opacity:1;transform:translateY(0)} }
+        .toast { animation: toastIn .3s ease, toastOut .3s ease 2.7s forwards; }
+        @keyframes toastIn { from{opacity:0;transform:translateX(100%)} to{opacity:1;transform:translateX(0)} }
+        @keyframes toastOut { from{opacity:1;transform:translateX(0)} to{opacity:0;transform:translateX(100%)} }
+        .badge-new { background: linear-gradient(135deg, #059669, #10b981); }
+        .badge-good { background: linear-gradient(135deg, #2563eb, #3b82f6); }
+        .badge-fair { background: linear-gradient(135deg, #d97706, #f59e0b); }
+        .badge-broken { background: linear-gradient(135deg, #dc2626, #ef4444); }
+        tr.selected-row { background: #ecfdf5 !important; }
+        .nav-active { background: rgba(16,185,129,.15); color: #10b981; border-left: 3px solid #10b981; }
+        .nav-item { border-left: 3px solid transparent; }
+        input:focus, select:focus, textarea:focus { outline: none; box-shadow: 0 0 0 3px rgba(16,185,129,.2); border-color: #10b981; }
+        .stat-card { transition: transform .2s, box-shadow .2s; }
+        .stat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,.08); }
+        .table-row { transition: background .15s; }
+        .table-row:hover { background: #f8fafc; }
+        .print-only { display: none; }
+        @media print { .print-only { display: block; } .no-print { display: none; } }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800" x-data="app()" x-init="init()">
+
+<!-- ===== TOAST NOTIFICATIONS ===== -->
+<div class="fixed top-4 right-4 z-[100] space-y-2 no-print" id="toastContainer">
+    <template x-for="(t, i) in toasts" :key="t.id">
+        <div class="toast flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl text-white text-sm font-medium min-w-[280px]"
+            :class="t.type === 'success' ? 'bg-emerald-600' : t.type === 'error' ? 'bg-rose-600' : 'bg-blue-600'">
+            <i :class="t.type === 'success' ? 'fas fa-check-circle' : t.type === 'error' ? 'fas fa-times-circle' : 'fas fa-info-circle'"></i>
+            <span x-text="t.msg"></span>
+        </div>
+    </template>
+</div>
+
+<!-- ===== MODALS ===== -->
+<!-- Item Modal (Add/Edit) -->
+<div x-show="modals.item" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay" style="background:rgba(0,0,0,.6)">
+    <div class="bg-white rounded-2xl w-full max-w-2xl shadow-2xl slide-in max-h-[90vh] overflow-y-auto" @click.stop>
+        <div class="flex items-center justify-between p-6 border-b border-slate-100">
+            <div>
+                <h3 class="font-bold text-xl text-slate-800" x-text="editingItem ? 'Edit Item' : 'Tambah Item Baru'"></h3>
+                <p class="text-sm text-slate-500 mt-0.5">Data inventaris alat hiking</p>
+            </div>
+            <button @click="modals.item = false" class="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="sm:col-span-2">
+                <label class="text-sm font-semibold text-slate-700 block mb-1.5">Nama Barang <span class="text-rose-500">*</span></label>
+                <input x-model="itemForm.name" type="text" placeholder="Contoh: Tenda Kapasitas 4P Consina" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm transition">
+            </div>
+            <div>
+                <label class="text-sm font-semibold text-slate-700 block mb-1.5">SKU <span class="text-rose-500">*</span></label>
+                <input x-model="itemForm.sku" type="text" placeholder="TND-001" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm transition font-mono">
+            </div>
+            <div>
+                <label class="text-sm font-semibold text-slate-700 block mb-1.5">Kategori <span class="text-rose-500">*</span></label>
+                <select x-model="itemForm.category" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm transition bg-white">
+                    <option value="">-- Pilih Kategori --</option>
+                    <template x-for="cat in categories" :key="cat"><option :value="cat" x-text="cat"></option></template>
+                </select>
+            </div>
+            <div>
+                <label class="text-sm font-semibold text-slate-700 block mb-1.5">Harga Sewa/Hari (Rp)</label>
+                <input x-model.number="itemForm.rental_price" type="number" min="0" placeholder="50000" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm transition">
+            </div>
+            <div>
+                <label class="text-sm font-semibold text-slate-700 block mb-1.5">Harga Modal/Beli (Rp)</label>
+                <input x-model.number="itemForm.purchase_price" type="number" min="0" placeholder="450000" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm transition">
+            </div>
+            <div>
+                <label class="text-sm font-semibold text-slate-700 block mb-1.5">Total Stok</label>
+                <input x-model.number="itemForm.total_stock" type="number" min="1" placeholder="5" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm transition">
+            </div>
+            <div>
+                <label class="text-sm font-semibold text-slate-700 block mb-1.5">Stok Tersedia</label>
+                <input x-model.number="itemForm.available_stock" type="number" min="0" placeholder="5" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm transition">
+            </div>
+            <div>
+                <label class="text-sm font-semibold text-slate-700 block mb-1.5">Kondisi</label>
+                <select x-model="itemForm.condition" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm transition bg-white">
+                    <option value="Baru">Baru</option>
+                    <option value="Layak Pakai">Layak Pakai</option>
+                    <option value="Perlu Perbaikan">Perlu Perbaikan</option>
+                    <option value="Tidak Layak">Tidak Layak</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-sm font-semibold text-slate-700 block mb-1.5">Variasi / Ukuran</label>
+                <input x-model="itemForm.variation" type="text" placeholder="Size 42, Merah, dll" class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm transition">
+            </div>
+            <div class="sm:col-span-2">
+                <label class="text-sm font-semibold text-slate-700 block mb-1.5">Catatan</label>
+                <textarea x-model="itemForm.notes" rows="2" placeholder="Catatan kondisi atau informasi tambahan..." class="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm transition resize-none"></textarea>
+            </div>
+        </div>
+        <div class="flex gap-3 p-6 pt-0">
+            <button @click="modals.item = false" class="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 transition">Batal</button>
+            <button @click="saveItem()" class="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold transition flex items-center justify-center gap-2">
+                <i class="fas fa-save"></i> <span x-text="editingItem ? 'Simpan Perubahan' : 'Tambah Item'"></span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div x-show="modals.deleteConfirm" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay" style="background:rgba(0,0,0,.6)">
+    <div class="bg-white rounded-2xl w-full max-w-sm shadow-2xl slide-in p-6 text-center" @click.stop>
+        <div class="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="fas fa-trash text-rose-500 text-2xl"></i>
+        </div>
+        <h3 class="font-bold text-xl text-slate-800 mb-2">Hapus Item?</h3>
+        <p class="text-slate-500 text-sm mb-6">Item <strong x-text="deleteTarget?.name"></strong> akan dihapus permanen dari sistem.</p>
+        <div class="flex gap-3">
+            <button @click="modals.deleteConfirm = false; deleteTarget = null" class="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 transition">Batal</button>
+            <button @click="confirmDelete()" class="flex-1 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-semibold transition">Ya, Hapus</button>
+        </div>
+    </div>
+</div>
+
+<!-- Transaction Detail Modal -->
+<div x-show="modals.txDetail" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay" style="background:rgba(0,0,0,.6)">
+    <div class="bg-white rounded-2xl w-full max-w-lg shadow-2xl slide-in max-h-[90vh] overflow-y-auto" @click.stop x-show="selectedTx">
+        <div class="flex items-center justify-between p-6 border-b border-slate-100">
+            <div>
+                <h3 class="font-bold text-lg text-slate-800" x-text="selectedTx?.id"></h3>
+                <p class="text-xs text-slate-500 mt-0.5">Detail Transaksi Sewa</p>
+            </div>
+            <button @click="modals.txDetail = false" class="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="p-6 space-y-4" x-show="selectedTx">
+            <div class="grid grid-cols-2 gap-3">
+                <div class="bg-slate-50 rounded-xl p-3">
+                    <p class="text-xs text-slate-500 mb-1">Customer</p>
+                    <p class="font-semibold text-slate-800 text-sm" x-text="selectedTx?.name"></p>
+                    <p class="text-xs text-slate-500" x-text="selectedTx?.phone"></p>
+                </div>
+                <div class="bg-slate-50 rounded-xl p-3">
+                    <p class="text-xs text-slate-500 mb-1">Status</p>
+                    <span class="px-2 py-1 rounded-full text-xs font-semibold inline-block"
+                        :class="selectedTx?.status === 'Sedang Disewa' ? 'bg-blue-100 text-blue-700' : selectedTx?.status === 'Booked' ? 'bg-amber-100 text-amber-700' : selectedTx?.status === 'Terlambat' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'"
+                        x-text="selectedTx?.status"></span>
+                </div>
+                <div class="bg-slate-50 rounded-xl p-3">
+                    <p class="text-xs text-slate-500 mb-1">Tanggal Ambil</p>
+                    <p class="font-medium text-sm" x-text="selectedTx?.pickup"></p>
+                </div>
+                <div class="bg-slate-50 rounded-xl p-3">
+                    <p class="text-xs text-slate-500 mb-1">Tanggal Kembali</p>
+                    <p class="font-medium text-sm" :class="selectedTx?.status === 'Terlambat' ? 'text-rose-600 font-bold' : ''" x-text="selectedTx?.return"></p>
+                </div>
+            </div>
+            <div class="bg-slate-50 rounded-xl p-4">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Item Disewa</p>
+                <p class="text-sm text-slate-700" x-text="selectedTx?.items"></p>
+            </div>
+            <div class="grid grid-cols-3 gap-3">
+                <div class="bg-emerald-50 rounded-xl p-3 text-center">
+                    <p class="text-xs text-emerald-600 mb-1">Subtotal</p>
+                    <p class="font-bold text-emerald-800 text-sm" x-text="'Rp ' + (selectedTx?.total || 0).toLocaleString()"></p>
+                </div>
+                <div class="bg-blue-50 rounded-xl p-3 text-center">
+                    <p class="text-xs text-blue-600 mb-1">Deposit</p>
+                    <p class="font-bold text-blue-800 text-sm" x-text="'Rp ' + Math.round((selectedTx?.total || 0) * 0.3).toLocaleString()"></p>
+                </div>
+                <div class="bg-amber-50 rounded-xl p-3 text-center">
+                    <p class="text-xs text-amber-600 mb-1">Denda</p>
+                    <p class="font-bold text-amber-800 text-sm" x-text="selectedTx?.penalty ? 'Rp ' + selectedTx.penalty.toLocaleString() : 'Rp 0'"></p>
+                </div>
+            </div>
+            <div class="bg-slate-800 rounded-xl p-4 text-white">
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-300 text-sm">Total Akhir</span>
+                    <span class="font-bold text-lg text-emerald-400" x-text="'Rp ' + ((selectedTx?.total || 0) + (selectedTx?.penalty || 0)).toLocaleString()"></span>
+                </div>
+            </div>
+        </div>
+        <div class="flex gap-2 p-6 pt-0">
+            <button @click="sendWhatsApp(selectedTx)" class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold transition">
+                <i class="fab fa-whatsapp"></i> Kirim WA
+            </button>
+            <button @click="printReceipt(selectedTx)" class="flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-sm font-medium transition">
+                <i class="fas fa-print"></i> Cetak
+            </button>
+            <button @click="modals.txDetail = false" class="flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-sm font-medium transition">
+                Tutup
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- New Transaction Modal -->
+<div x-show="modals.newTx" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay" style="background:rgba(0,0,0,.6)">
+    <div class="bg-white rounded-2xl w-full max-w-2xl shadow-2xl slide-in max-h-[90vh] overflow-y-auto" @click.stop>
+        <div class="flex items-center justify-between p-6 border-b border-slate-100">
+            <div>
+                <h3 class="font-bold text-xl text-slate-800">Transaksi Baru</h3>
+                <p class="text-sm text-slate-500 mt-0.5">Catat peminjaman alat baru</p>
+            </div>
+            <button @click="modals.newTx = false" class="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="p-6 space-y-5">
+            <!-- Customer Info -->
+            <div>
+                <h4 class="text-sm font-bold text-slate-700 uppercase tracking-wider mb-3 flex items-center gap-2"><i class="fas fa-user text-emerald-500"></i> Data Customer</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs font-semibold text-slate-600 block mb-1">Nama Lengkap <span class="text-rose-500">*</span></label>
+                        <input x-model="txForm.customerName" type="text" placeholder="Budi Santoso" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm transition">
+                    </div>
+                    <div>
+                        <label class="text-xs font-semibold text-slate-600 block mb-1">No. WhatsApp <span class="text-rose-500">*</span></label>
+                        <input x-model="txForm.phone" type="text" placeholder="0812-3456-7890" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm transition">
+                    </div>
+                    <div>
+                        <label class="text-xs font-semibold text-slate-600 block mb-1">Jenis ID</label>
+                        <select x-model="txForm.idType" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm transition bg-white">
+                            <option value="KTP">KTP</option>
+                            <option value="SIM">SIM</option>
+                            <option value="KTM">KTM</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs font-semibold text-slate-600 block mb-1">Nomor ID</label>
+                        <input x-model="txForm.idNumber" type="text" placeholder="3174xxx" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm transition font-mono">
+                    </div>
+                </div>
+            </div>
+            <!-- Rental Period -->
+            <div>
+                <h4 class="text-sm font-bold text-slate-700 uppercase tracking-wider mb-3 flex items-center gap-2"><i class="fas fa-calendar text-emerald-500"></i> Periode Sewa</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs font-semibold text-slate-600 block mb-1">Tanggal Ambil <span class="text-rose-500">*</span></label>
+                        <input x-model="txForm.pickupDate" type="date" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm transition">
+                    </div>
+                    <div>
+                        <label class="text-xs font-semibold text-slate-600 block mb-1">Tanggal Kembali (default H+4)</label>
+                        <input x-model="txForm.returnDate" type="date" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm transition">
+                    </div>
+                </div>
+            </div>
+            <!-- Items -->
+            <div>
+                <h4 class="text-sm font-bold text-slate-700 uppercase tracking-wider mb-3 flex items-center gap-2"><i class="fas fa-box text-emerald-500"></i> Item yang Disewa</h4>
+                <div class="space-y-2 mb-3">
+                    <template x-for="(txItem, idx) in txForm.items" :key="idx">
+                        <div class="flex gap-2 items-center bg-slate-50 rounded-xl p-3">
+                            <select x-model="txItem.itemId" @change="updateTxItemPrice(idx)" class="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-xs transition bg-white">
+                                <option value="">-- Pilih Item --</option>
+                                <template x-for="it in items.filter(i => i.available_stock > 0)" :key="it.id">
+                                    <option :value="it.id" x-text="`${it.name} (${it.available_stock} tersedia) - Rp ${it.rental_price.toLocaleString()}/hr`"></option>
+                                </template>
+                            </select>
+                            <input x-model.number="txItem.qty" type="number" min="1" max="10" class="w-16 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-center transition" placeholder="Qty">
+                            <span class="text-xs text-slate-500 w-24 text-right" x-text="'Rp ' + (txItem.price * txItem.qty * txDays).toLocaleString()"></span>
+                            <button @click="txForm.items.splice(idx,1)" class="p-1.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"><i class="fas fa-times text-xs"></i></button>
+                        </div>
+                    </template>
+                </div>
+                <button @click="txForm.items.push({itemId:'',qty:1,price:0})" class="w-full border-2 border-dashed border-slate-200 hover:border-emerald-400 text-slate-500 hover:text-emerald-600 rounded-xl px-4 py-2 text-sm font-medium transition flex items-center justify-center gap-2">
+                    <i class="fas fa-plus"></i> Tambah Item
+                </button>
+            </div>
+            <!-- Payment -->
+            <div>
+                <h4 class="text-sm font-bold text-slate-700 uppercase tracking-wider mb-3 flex items-center gap-2"><i class="fas fa-credit-card text-emerald-500"></i> Pembayaran</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs font-semibold text-slate-600 block mb-1">Metode Bayar</label>
+                        <select x-model="txForm.paymentMethod" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm transition bg-white">
+                            <option value="Cash">Cash</option>
+                            <option value="QRIS">QRIS</option>
+                            <option value="Transfer">Transfer Bank</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs font-semibold text-slate-600 block mb-1">Status Bayar</label>
+                        <select x-model="txForm.paymentStatus" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm transition bg-white">
+                            <option value="Lunas">Lunas</option>
+                            <option value="DP">DP / Belum Lunas</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <!-- Summary -->
+            <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4">
+                <div class="flex justify-between text-sm mb-2"><span class="text-slate-600">Lama Sewa</span><span class="font-semibold" x-text="txDays + ' hari'"></span></div>
+                <div class="flex justify-between text-sm mb-2"><span class="text-slate-600">Subtotal Sewa</span><span class="font-semibold" x-text="'Rp ' + txSubtotal.toLocaleString()"></span></div>
+                <div class="flex justify-between text-sm mb-2"><span class="text-slate-600">Deposit (30%)</span><span class="font-semibold" x-text="'Rp ' + txDeposit.toLocaleString()"></span></div>
+                <div class="flex justify-between text-base font-bold border-t border-emerald-200 pt-2 mt-2"><span>Total Bayar</span><span class="text-emerald-700" x-text="'Rp ' + (txSubtotal + txDeposit).toLocaleString()"></span></div>
+            </div>
+            <div>
+                <label class="text-xs font-semibold text-slate-600 block mb-1">Catatan</label>
+                <textarea x-model="txForm.notes" rows="2" placeholder="Catatan tambahan..." class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm transition resize-none"></textarea>
+            </div>
+        </div>
+        <div class="flex gap-3 p-6 pt-0">
+            <button @click="modals.newTx = false" class="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 transition">Batal</button>
+            <button @click="saveTransaction()" class="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold transition flex items-center justify-center gap-2">
+                <i class="fas fa-save"></i> Simpan Transaksi
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- WA Preview Modal -->
+<div x-show="modals.waPreview" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay" style="background:rgba(0,0,0,.6)">
+    <div class="bg-white rounded-2xl w-full max-w-sm shadow-2xl slide-in" @click.stop>
+        <div class="flex items-center justify-between p-5 border-b border-slate-100">
+            <h3 class="font-bold text-slate-800 flex items-center gap-2"><i class="fab fa-whatsapp text-emerald-500"></i> Kirim WhatsApp</h3>
+            <button @click="modals.waPreview = false" class="p-2 text-slate-400 hover:text-slate-600 rounded-xl"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="p-5">
+            <div class="bg-[#dcf8c6] rounded-2xl rounded-tl-none p-4 text-sm text-slate-800 mb-4 font-mono leading-relaxed whitespace-pre-wrap" x-text="waMessage"></div>
+            <p class="text-xs text-slate-500 mb-4">Pesan akan dibuka di WhatsApp Web. Nomor tujuan: <strong x-text="waTarget?.phone"></strong></p>
+            <div class="flex gap-2">
+                <button @click="modals.waPreview = false" class="flex-1 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50 transition">Batal</button>
+                <button @click="openWhatsApp()" class="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold transition flex items-center justify-center gap-2">
+                    <i class="fab fa-whatsapp"></i> Buka WA
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Notification Dropdown -->
+<div x-show="showNotif" x-cloak @click.away="showNotif = false" class="fixed top-16 right-4 z-50 w-80 bg-white rounded-2xl shadow-2xl border border-slate-100 slide-in">
+    <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+        <h3 class="font-bold text-slate-800">Notifikasi</h3>
+        <button @click="markAllRead()" class="text-xs text-emerald-600 hover:underline">Tandai Semua Dibaca</button>
+    </div>
+    <div class="max-h-80 overflow-y-auto divide-y divide-slate-100">
+        <template x-for="n in notifications" :key="n.id">
+            <div class="p-4 hover:bg-slate-50 cursor-pointer transition" :class="!n.read ? 'bg-emerald-50/50' : ''" @click="n.read = true">
+                <div class="flex items-start gap-3">
+                    <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs"
+                        :class="n.type === 'warning' ? 'bg-amber-100 text-amber-600' : n.type === 'danger' ? 'bg-rose-100 text-rose-600' : 'bg-blue-100 text-blue-600'">
+                        <i :class="n.type === 'warning' ? 'fas fa-exclamation-triangle' : n.type === 'danger' ? 'fas fa-clock' : 'fas fa-info-circle'"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-slate-800" x-text="n.title"></p>
+                        <p class="text-xs text-slate-500 mt-0.5" x-text="n.msg"></p>
+                    </div>
+                    <span x-show="!n.read" class="w-2 h-2 bg-emerald-500 rounded-full flex-shrink-0 mt-2"></span>
+                </div>
+            </div>
+        </template>
+    </div>
+</div>
+
+<!-- ===== MAIN LAYOUT ===== -->
+<div class="flex h-screen overflow-hidden">
+
+    <!-- Sidebar -->
+    <aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
+        class="fixed lg:static lg:translate-x-0 z-40 w-72 h-full gradient-bg text-white flex flex-col transition-transform duration-300 no-print">
+        <div class="p-5 border-b border-white/10">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-xl flex items-center justify-center shadow-lg">
+                    <i class="fas fa-mountain text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-extrabold text-lg leading-tight tracking-tight">Basecamp Rental</h1>
+                    <p class="text-xs text-slate-400">Management System v3.0</p>
+                </div>
+            </div>
+        </div>
+
+        <nav class="flex-1 p-3 space-y-0.5 overflow-y-auto">
+            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-3 py-2">Operasional</p>
+            <button @click="activeTab = 'dashboard'; sidebarOpen = false"
+                :class="activeTab === 'dashboard' ? 'nav-active' : 'nav-item text-slate-400 hover:bg-white/5 hover:text-white'"
+                class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition text-sm font-medium">
+                <i class="fas fa-chart-line w-4"></i> Dashboard
+            </button>
+            <button @click="activeTab = 'master'; sidebarOpen = false"
+                :class="activeTab === 'master' ? 'nav-active' : 'nav-item text-slate-400 hover:bg-white/5 hover:text-white'"
+                class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition text-sm font-medium">
+                <i class="fas fa-box w-4"></i> Master Data
+                <span class="ml-auto bg-white/10 text-xs px-2 py-0.5 rounded-full" x-text="items.length"></span>
+            </button>
+            <button @click="activeTab = 'transaksi'; sidebarOpen = false"
+                :class="activeTab === 'transaksi' ? 'nav-active' : 'nav-item text-slate-400 hover:bg-white/5 hover:text-white'"
+                class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition text-sm font-medium">
+                <i class="fas fa-receipt w-4"></i> Transaksi
+                <span class="ml-auto bg-emerald-500/20 text-emerald-400 text-xs px-2 py-0.5 rounded-full" x-text="transactions.filter(t=>t.status==='Sedang Disewa').length + ' aktif'"></span>
+            </button>
+            <button @click="activeTab = 'customers'; sidebarOpen = false"
+                :class="activeTab === 'customers' ? 'nav-active' : 'nav-item text-slate-400 hover:bg-white/5 hover:text-white'"
+                class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition text-sm font-medium">
+                <i class="fas fa-users w-4"></i> Customer
+                <span class="ml-auto bg-white/10 text-xs px-2 py-0.5 rounded-full" x-text="customers.length"></span>
+            </button>
+
+            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-3 py-2 mt-3">Blueprint</p>
+            <button @click="activeTab = 'database'; sidebarOpen = false"
+                :class="activeTab === 'database' ? 'nav-active' : 'nav-item text-slate-400 hover:bg-white/5 hover:text-white'"
+                class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition text-sm font-medium">
+                <i class="fas fa-database w-4"></i> Database Schema
+            </button>
+            <button @click="activeTab = 'techstack'; sidebarOpen = false"
+                :class="activeTab === 'techstack' ? 'nav-active' : 'nav-item text-slate-400 hover:bg-white/5 hover:text-white'"
+                class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition text-sm font-medium">
+                <i class="fas fa-layer-group w-4"></i> Tech Stack
+            </button>
+            <button @click="activeTab = 'workflow'; sidebarOpen = false"
+                :class="activeTab === 'workflow' ? 'nav-active' : 'nav-item text-slate-400 hover:bg-white/5 hover:text-white'"
+                class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition text-sm font-medium">
+                <i class="fas fa-route w-4"></i> Alur Transaksi
+            </button>
+            <button @click="activeTab = 'features'; sidebarOpen = false"
+                :class="activeTab === 'features' ? 'nav-active' : 'nav-item text-slate-400 hover:bg-white/5 hover:text-white'"
+                class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition text-sm font-medium">
+                <i class="fas fa-star w-4"></i> Super Features
+            </button>
+        </nav>
+
+        <div class="p-4 border-t border-white/10">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center font-bold text-sm shadow">AD</div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-semibold truncate">Admin Utama</p>
+                    <p class="text-xs text-slate-400 truncate">admin@basecamp.id</p>
+                </div>
+                <span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs rounded-full font-medium">Admin</span>
+            </div>
+        </div>
+    </aside>
+
+    <div x-show="sidebarOpen" @click="sidebarOpen = false" x-cloak class="fixed inset-0 bg-black/50 z-30 lg:hidden"></div>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto">
+        <!-- Top Bar -->
+        <header class="bg-white/80 backdrop-blur border-b border-slate-200 px-5 py-3.5 flex items-center justify-between sticky top-0 z-20 no-print">
+            <div class="flex items-center gap-3">
+                <button @click="sidebarOpen = true" class="lg:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-xl">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div>
+                    <h2 class="text-lg font-extrabold text-slate-800" x-text="tabTitle"></h2>
+                    <p class="text-xs text-slate-500" x-text="tabSubtitle"></p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="hidden md:flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-xl">
+                    <span class="w-2 h-2 bg-emerald-500 rounded-full pulse-dot"></span>
+                    <i class="fab fa-whatsapp text-emerald-600 text-sm"></i>
+                    <span class="text-xs font-semibold text-slate-700">WA Gateway Aktif</span>
+                </div>
+                <div class="relative">
+                    <button @click="showNotif = !showNotif" class="relative p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition">
+                        <i class="fas fa-bell text-lg"></i>
+                        <span x-show="unreadNotif > 0" class="absolute top-1 right-1 w-4 h-4 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center" x-text="unreadNotif"></span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <div class="p-5 max-w-[1600px] mx-auto">
+
+            <!-- ===== DASHBOARD ===== -->
+            <div x-show="activeTab === 'dashboard'" x-transition:enter="transition-opacity duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+                    <div class="stat-card bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+                        <div class="flex items-start justify-between mb-3">
+                            <div class="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center"><i class="fas fa-wallet"></i></div>
+                            <span class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">+12%</span>
+                        </div>
+                        <p class="text-xs text-slate-500 font-medium">Pendapatan Hari Ini</p>
+                        <p class="text-xl font-extrabold text-slate-800 mt-1" x-text="'Rp ' + todayRevenue.toLocaleString()"></p>
+                    </div>
+                    <div class="stat-card bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+                        <div class="flex items-start justify-between mb-3">
+                            <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center"><i class="fas fa-box-open"></i></div>
+                            <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">Aktif</span>
+                        </div>
+                        <p class="text-xs text-slate-500 font-medium">Sedang Disewa</p>
+                        <p class="text-xl font-extrabold text-slate-800 mt-1" x-text="transactions.filter(t=>t.status==='Sedang Disewa').length + ' Transaksi'"></p>
+                    </div>
+                    <div class="stat-card bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+                        <div class="flex items-start justify-between mb-3">
+                            <div class="w-10 h-10 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center"><i class="fas fa-exclamation-triangle"></i></div>
+                            <span class="text-xs font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-lg">Perhatian</span>
+                        </div>
+                        <p class="text-xs text-slate-500 font-medium">Stok Menipis</p>
+                        <p class="text-xl font-extrabold text-slate-800 mt-1" x-text="lowStockItems.length + ' SKU'"></p>
+                    </div>
+                    <div class="stat-card bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+                        <div class="flex items-start justify-between mb-3">
+                            <div class="w-10 h-10 bg-rose-100 text-rose-600 rounded-xl flex items-center justify-center"><i class="fas fa-clock"></i></div>
+                            <span class="text-xs font-bold text-rose-600 bg-rose-50 px-2 py-1 rounded-lg">Hari Ini</span>
+                        </div>
+                        <p class="text-xs text-slate-500 font-medium">Jatuh Tempo</p>
+                        <p class="text-xl font-extrabold text-slate-800 mt-1" x-text="dueTodayTx.length + ' Transaksi'"></p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
+                    <div class="lg:col-span-2 bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+                        <div class="flex items-center justify-between mb-5">
+                            <div>
+                                <h3 class="font-bold text-slate-800">Pendapatan 7 Hari Terakhir</h3>
+                                <p class="text-xs text-slate-500 mt-0.5">Total: <span class="font-semibold text-emerald-600">Rp 18.750.000</span></p>
+                            </div>
+                        </div>
+                        <div class="flex items-end justify-between h-44 gap-2">
+                            <template x-for="(v, i) in chartData" :key="i">
+                                <div class="flex-1 flex flex-col items-center gap-2">
+                                    <div class="w-full bg-gradient-to-t from-emerald-600 to-emerald-300 rounded-t-lg chart-bar relative group cursor-pointer"
+                                        :style="`height: ${v.pct}%`"
+                                        @click="showToast(`${v.label}: Rp ${(v.val*500).toLocaleString()}k`, 'info')">
+                                        <div class="absolute -top-9 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition whitespace-nowrap shadow" x-text="`Rp ${(v.val*500).toLocaleString()}k`"></div>
+                                    </div>
+                                    <span class="text-[11px] font-medium text-slate-500" x-text="v.label"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+                        <h3 class="font-bold text-slate-800 mb-4">Kategori Terlaris</h3>
+                        <div class="space-y-3">
+                            <template x-for="cat in categoryStats" :key="cat.name">
+                                <div>
+                                    <div class="flex justify-between text-xs mb-1.5">
+                                        <span class="font-semibold text-slate-700" x-text="cat.name"></span>
+                                        <span class="text-slate-400" x-text="cat.pct + '%'"></span>
+                                    </div>
+                                    <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                        <div class="h-2 rounded-full transition-all duration-700" :style="`width: ${cat.pct}%; background: ${cat.color}`"></div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                        <div class="mt-5 pt-4 border-t border-slate-100">
+                            <div class="flex justify-between text-xs text-slate-500">
+                                <span>Total Inventaris</span>
+                                <span class="font-bold text-slate-800" x-text="items.length + ' item'"></span>
+                            </div>
+                            <div class="flex justify-between text-xs text-slate-500 mt-1">
+                                <span>Total Customer</span>
+                                <span class="font-bold text-slate-800" x-text="customers.length + ' orang'"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+                            <h3 class="font-bold text-slate-800 text-sm"><i class="fas fa-calendar-check text-rose-500 mr-2"></i>Jatuh Tempo Hari Ini</h3>
+                            <span class="text-xs bg-rose-50 text-rose-600 px-2.5 py-1 rounded-full font-bold" x-text="dueTodayTx.length + ' transaksi'"></span>
+                        </div>
+                        <div class="divide-y divide-slate-100">
+                            <template x-if="dueTodayTx.length === 0">
+                                <div class="p-8 text-center text-slate-400 text-sm"><i class="fas fa-check-circle text-2xl text-emerald-400 mb-2 block"></i>Tidak ada yang jatuh tempo</div>
+                            </template>
+                            <template x-for="t in dueTodayTx.slice(0,4)" :key="t.id">
+                                <div class="p-4 flex items-center justify-between hover:bg-slate-50 transition table-row">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center font-bold text-xs text-slate-600" x-text="t.name.split(' ').map(n=>n[0]).join('')"></div>
+                                        <div>
+                                            <p class="font-semibold text-sm text-slate-800" x-text="t.name"></p>
+                                            <p class="text-xs text-slate-500" x-text="t.items"></p>
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-sm font-bold text-rose-600" x-text="t.return"></p>
+                                        <button @click="sendWhatsApp(t)" class="text-xs text-emerald-600 hover:text-emerald-700 font-medium mt-0.5 transition"><i class="fab fa-whatsapp"></i> Ingatkan</button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+                            <h3 class="font-bold text-slate-800 text-sm"><i class="fas fa-exclamation-triangle text-amber-500 mr-2"></i>Stok Menipis</h3>
+                            <span class="text-xs bg-amber-50 text-amber-600 px-2.5 py-1 rounded-full font-bold" x-text="lowStockItems.length + ' SKU'"></span>
+                        </div>
+                        <div class="divide-y divide-slate-100">
+                            <template x-if="lowStockItems.length === 0">
+                                <div class="p-8 text-center text-slate-400 text-sm"><i class="fas fa-boxes text-2xl text-emerald-400 mb-2 block"></i>Stok semua aman</div>
+                            </template>
+                            <template x-for="item in lowStockItems.slice(0,4)" :key="item.id">
+                                <div class="p-4 flex items-center justify-between hover:bg-slate-50 transition table-row">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 text-xs"><i class="fas fa-box"></i></div>
+                                        <div>
+                                            <p class="font-semibold text-sm text-slate-800" x-text="item.name"></p>
+                                            <p class="text-xs text-slate-400" x-text="item.sku + ' • ' + item.category"></p>
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-sm font-bold" :class="item.available_stock === 0 ? 'text-rose-600' : 'text-amber-600'" x-text="'Tersisa ' + item.available_stock"></p>
+                                        <p class="text-xs text-slate-400" x-text="'dari ' + item.total_stock"></p>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== MASTER DATA ===== -->
+            <div x-show="activeTab === 'master'" x-transition:enter="transition-opacity duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-cloak>
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="flex flex-col sm:flex-row gap-2 flex-1">
+                            <div class="relative flex-1 max-w-xs">
+                                <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                                <input type="text" x-model="masterSearch" placeholder="Cari SKU, nama, kategori..." class="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm transition">
+                            </div>
+                            <select x-model="masterCatFilter" class="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white transition">
+                                <option value="">Semua Kategori</option>
+                                <template x-for="cat in categories" :key="cat"><option :value="cat" x-text="cat"></option></template>
+                            </select>
+                            <select x-model="masterCondFilter" class="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white transition">
+                                <option value="">Semua Kondisi</option>
+                                <option value="Baru">Baru</option>
+                                <option value="Layak Pakai">Layak Pakai</option>
+                                <option value="Perlu Perbaikan">Perlu Perbaikan</option>
+                            </select>
+                        </div>
+                        <button @click="openAddItem()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 transition shadow-sm whitespace-nowrap">
+                            <i class="fas fa-plus"></i> Tambah Item
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-slate-50 border-b border-slate-200">
+                                <tr>
+                                    <th class="text-left px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Item</th>
+                                    <th class="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">SKU</th>
+                                    <th class="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Kategori</th>
+                                    <th class="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Harga/Hari</th>
+                                    <th class="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Stok</th>
+                                    <th class="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Kondisi</th>
+                                    <th class="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <template x-if="filteredItems.length === 0">
+                                    <tr><td colspan="7" class="text-center py-12 text-slate-400"><i class="fas fa-search text-3xl mb-3 block"></i>Tidak ada item ditemukan</td></tr>
+                                </template>
+                                <template x-for="item in filteredItems" :key="item.id">
+                                    <tr class="table-row">
+                                        <td class="px-5 py-3">
+                                            <div class="flex items-center gap-3">
+                                                <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-slate-400 flex-shrink-0">
+                                                    <i :class="getCatIcon(item.category)"></i>
+                                                </div>
+                                                <div>
+                                                    <p class="font-semibold text-slate-800" x-text="item.name"></p>
+                                                    <p class="text-xs text-slate-400" x-text="item.variation || 'Standard'"></p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="px-4 py-3 font-mono text-xs font-bold text-slate-600 bg-slate-50/50" x-text="item.sku"></td>
+                                        <td class="px-4 py-3">
+                                            <span class="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-semibold" x-text="item.category"></span>
+                                        </td>
+                                        <td class="px-4 py-3 font-bold text-slate-800" x-text="'Rp ' + item.rental_price.toLocaleString()"></td>
+                                        <td class="px-4 py-3">
+                                            <div class="flex items-center gap-1.5">
+                                                <div class="w-2 h-2 rounded-full" :class="item.available_stock === 0 ? 'bg-rose-500' : item.available_stock <= 2 ? 'bg-amber-500' : 'bg-emerald-500'"></div>
+                                                <span class="font-bold" :class="item.available_stock === 0 ? 'text-rose-600' : 'text-slate-800'" x-text="item.available_stock"></span>
+                                                <span class="text-slate-400 text-xs" x-text="'/' + item.total_stock"></span>
+                                            </div>
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <span class="px-2.5 py-1 rounded-lg text-xs font-bold"
+                                                :class="item.condition === 'Baru' ? 'bg-emerald-100 text-emerald-700' : item.condition === 'Layak Pakai' ? 'bg-blue-100 text-blue-700' : item.condition === 'Perlu Perbaikan' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'"
+                                                x-text="item.condition"></span>
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <div class="flex gap-1">
+                                                <button @click="openEditItem(item)" class="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition" title="Edit"><i class="fas fa-edit text-xs"></i></button>
+                                                <button @click="askDeleteItem(item)" class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition" title="Hapus"><i class="fas fa-trash text-xs"></i></button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                        <span x-text="`Menampilkan ${filteredItems.length} dari ${items.length} item`"></span>
+                        <span x-text="`${items.filter(i=>i.available_stock===0).length} item habis stok`" class="text-rose-500 font-medium"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== TRANSAKSI ===== -->
+            <div x-show="activeTab === 'transaksi'" x-transition:enter="transition-opacity duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-cloak>
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="flex flex-wrap gap-2">
+                            <button @click="txFilter = ''" :class="txFilter === '' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'" class="px-3 py-1.5 rounded-xl text-xs font-semibold transition">
+                                Semua <span x-text="'(' + transactions.length + ')'"></span>
+                            </button>
+                            <button @click="txFilter = 'Booked'" :class="txFilter === 'Booked' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'" class="px-3 py-1.5 rounded-xl text-xs font-semibold transition">
+                                Booked <span x-text="'(' + transactions.filter(t=>t.status==='Booked').length + ')'"></span>
+                            </button>
+                            <button @click="txFilter = 'Sedang Disewa'" :class="txFilter === 'Sedang Disewa' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'" class="px-3 py-1.5 rounded-xl text-xs font-semibold transition">
+                                Disewa <span x-text="'(' + transactions.filter(t=>t.status==='Sedang Disewa').length + ')'"></span>
+                            </button>
+                            <button @click="txFilter = 'Terlambat'" :class="txFilter === 'Terlambat' ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'" class="px-3 py-1.5 rounded-xl text-xs font-semibold transition">
+                                Terlambat <span x-text="'(' + transactions.filter(t=>t.status==='Terlambat').length + ')'"></span>
+                            </button>
+                            <button @click="txFilter = 'Sudah Dikembalikan'" :class="txFilter === 'Sudah Dikembalikan' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'" class="px-3 py-1.5 rounded-xl text-xs font-semibold transition">
+                                Selesai <span x-text="'(' + transactions.filter(t=>t.status==='Sudah Dikembalikan').length + ')'"></span>
+                            </button>
+                        </div>
+                        <button @click="openNewTx()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 transition shadow-sm whitespace-nowrap">
+                            <i class="fas fa-plus"></i> Transaksi Baru
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-slate-50 border-b border-slate-200">
+                                <tr>
+                                    <th class="text-left px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">ID Transaksi</th>
+                                    <th class="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Customer</th>
+                                    <th class="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Periode</th>
+                                    <th class="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Item</th>
+                                    <th class="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Total</th>
+                                    <th class="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                                    <th class="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <template x-if="filteredTx.length === 0">
+                                    <tr><td colspan="7" class="text-center py-12 text-slate-400"><i class="fas fa-receipt text-3xl mb-3 block"></i>Belum ada transaksi</td></tr>
+                                </template>
+                                <template x-for="t in filteredTx" :key="t.id">
+                                    <tr class="table-row">
+                                        <td class="px-5 py-3">
+                                            <p class="font-mono font-bold text-slate-800 text-xs" x-text="t.id"></p>
+                                            <p class="text-xs text-slate-400 mt-0.5" x-text="t.phone"></p>
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <div class="flex items-center gap-2">
+                                                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center font-bold text-xs text-slate-600 flex-shrink-0" x-text="t.name.split(' ').map(n=>n[0]).join('')"></div>
+                                                <span class="font-semibold text-slate-800 text-xs" x-text="t.name"></span>
+                                            </div>
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <p class="text-xs text-slate-600 font-medium" x-text="t.pickup"></p>
+                                            <p class="text-xs text-slate-400" x-text="'→ ' + t.return"></p>
+                                        </td>
+                                        <td class="px-4 py-3 text-xs text-slate-600 max-w-[160px] truncate" x-text="t.items"></td>
+                                        <td class="px-4 py-3 font-bold text-slate-800 text-xs" x-text="'Rp ' + t.total.toLocaleString()"></td>
+                                        <td class="px-4 py-3">
+                                            <span class="px-2.5 py-1 rounded-lg text-xs font-bold"
+                                                :class="t.status === 'Sedang Disewa' ? 'bg-blue-100 text-blue-700' : t.status === 'Booked' ? 'bg-amber-100 text-amber-700' : t.status === 'Terlambat' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'"
+                                                x-text="t.status"></span>
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <div class="flex gap-1">
+                                                <button @click="viewTxDetail(t)" class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Detail"><i class="fas fa-eye text-xs"></i></button>
+                                                <button @click="sendWhatsApp(t)" class="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition" title="WhatsApp"><i class="fab fa-whatsapp text-xs"></i></button>
+                                                <button @click="printReceipt(t)" class="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition" title="Cetak"><i class="fas fa-print text-xs"></i></button>
+                                                <button @click="updateTxStatus(t)" x-show="t.status !== 'Sudah Dikembalikan'" class="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition" title="Update Status"><i class="fas fa-arrow-right text-xs"></i></button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                        <span x-text="`${filteredTx.length} transaksi ditampilkan`"></span>
+                        <span x-text="`Total: Rp ` + filteredTx.reduce((s,t)=>s+t.total,0).toLocaleString()" class="font-bold text-emerald-700"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== CUSTOMERS ===== -->
+            <div x-show="activeTab === 'customers'" x-transition:enter="transition-opacity duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-cloak>
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+                        <div class="relative">
+                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                            <input type="text" x-model="customerSearch" placeholder="Cari nama atau no. HP..." class="pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm transition w-64">
+                        </div>
+                        <div class="flex gap-2">
+                            <select x-model="customerTierFilter" class="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white transition">
+                                <option value="">Semua Tier</option>
+                                <option value="Bronze">Bronze</option>
+                                <option value="Silver">Silver</option>
+                                <option value="Gold">Gold</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-slate-50 border-b border-slate-200">
+                                <tr>
+                                    <th class="text-left px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Customer</th>
+                                    <th class="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Kontak</th>
+                                    <th class="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Total Sewa</th>
+                                    <th class="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Tier</th>
+                                    <th class="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Total Bayar</th>
+                                    <th class="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <template x-for="c in filteredCustomers" :key="c.id">
+                                    <tr class="table-row">
+                                        <td class="px-5 py-3">
+                                            <div class="flex items-center gap-3">
+                                                <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm text-white flex-shrink-0"
+                                                    :style="`background: ${stringToColor(c.name)}`"
+                                                    x-text="c.name.split(' ').map(n=>n[0]).join('').slice(0,2)"></div>
+                                                <div>
+                                                    <p class="font-semibold text-slate-800" x-text="c.name"></p>
+                                                    <p class="text-xs text-slate-400" x-text="c.id_type + ': ' + c.id_number"></p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="px-4 py-3">
+                                            <p class="text-xs font-medium text-slate-700" x-text="c.phone"></p>
+                                            <button @click="sendWhatsApp({name: c.name, phone: c.phone, id: 'CS', items: 'Info', total: 0})" class="text-xs text-emerald-600 hover:underline"><i class="fab fa-whatsapp"></i> Chat</button>
+                                        </td>
+                                        <td class="px-4 py-3 font-bold text-slate-800" x-text="c.total_rentals + 'x'"></td>
+                                        <td class="px-4 py-3">
+                                            <span class="px-2.5 py-1 rounded-lg text-xs font-bold"
+                                                :class="c.tier === 'Gold' ? 'bg-amber-100 text-amber-700' : c.tier === 'Silver' ? 'bg-slate-100 text-slate-600' : 'bg-orange-100 text-orange-700'"
+                                                x-text="c.tier"></span>
+                                        </td>
+                                        <td class="px-4 py-3 font-bold text-emerald-700" x-text="'Rp ' + c.total_spent.toLocaleString()"></td>
+                                        <td class="px-4 py-3">
+                                            <button @click="showToast('Riwayat ' + c.name + ' ditampilkan', 'info')" class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Riwayat"><i class="fas fa-history text-xs"></i></button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== DATABASE SCHEMA ===== -->
+            <div x-show="activeTab === 'database'" x-transition:enter="transition-opacity duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-cloak>
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    <template x-for="tbl in dbTables" :key="tbl.name">
+                        <div class="bg-white rounded-2xl border-2 shadow-sm overflow-hidden" :class="tbl.highlight ? 'border-emerald-400' : 'border-slate-200'">
+                            <div class="px-4 py-3 flex items-center justify-between text-white" :style="`background: ${tbl.color}`">
+                                <div class="flex items-center gap-2">
+                                    <i :class="tbl.icon"></i>
+                                    <span class="font-bold text-sm font-mono" x-text="tbl.name"></span>
+                                </div>
+                                <span class="text-xs bg-white/20 px-2 py-0.5 rounded-lg" x-text="tbl.tag"></span>
+                            </div>
+                            <div class="p-3 space-y-1.5">
+                                <template x-for="col in tbl.columns" :key="col.name">
+                                    <div class="flex items-center gap-2 p-2 rounded-lg" :class="col.pk ? 'bg-amber-50 border border-amber-200' : col.fk ? 'bg-rose-50 border border-rose-200' : 'bg-slate-50'">
+                                        <i x-show="col.pk" class="fas fa-key text-amber-500 text-[10px]"></i>
+                                        <i x-show="col.fk" class="fas fa-link text-rose-500 text-[10px]"></i>
+                                        <span class="text-xs font-semibold text-slate-700" x-text="col.name"></span>
+                                        <span class="text-[10px] text-slate-400 ml-auto font-mono" x-text="col.type"></span>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+                <div class="mt-5 bg-gradient-to-r from-emerald-50 to-blue-50 border border-emerald-200 rounded-2xl p-5">
+                    <h4 class="font-bold text-slate-800 mb-3"><i class="fas fa-sitemap text-emerald-600 mr-2"></i>Relasi Tabel</h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-slate-700">
+                        <div class="flex items-start gap-2"><span class="text-emerald-600 font-bold">•</span><span><strong>customers</strong> 1:N <strong>transactions</strong> — Satu penyewa, banyak transaksi</span></div>
+                        <div class="flex items-start gap-2"><span class="text-emerald-600 font-bold">•</span><span><strong>transactions</strong> 1:N <strong>transaction_items</strong> — Satu transaksi, banyak item</span></div>
+                        <div class="flex items-start gap-2"><span class="text-emerald-600 font-bold">•</span><span><strong>items</strong> 1:N <strong>transaction_items</strong> — Satu item di banyak transaksi</span></div>
+                        <div class="flex items-start gap-2"><span class="text-emerald-600 font-bold">•</span><span><strong>transactions</strong> 1:N <strong>payments</strong> — Dukung pembayaran bertahap</span></div>
+                        <div class="flex items-start gap-2"><span class="text-emerald-600 font-bold">•</span><span><strong>users</strong> 1:N <strong>transactions</strong> — Staff yang memproses tercatat</span></div>
+                        <div class="flex items-start gap-2"><span class="text-emerald-600 font-bold">•</span><span><strong>users</strong> 1:N <strong>audit_logs</strong> — Setiap aksi dicatat untuk keamanan</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== TECH STACK ===== -->
+            <div x-show="activeTab === 'techstack'" x-transition:enter="transition-opacity duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-cloak>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-5">
+                    <template x-for="tech in techStack" :key="tech.title">
+                        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition cursor-default">
+                            <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-4" :style="`background: ${tech.bg}; color: ${tech.color}`">
+                                <i :class="tech.icon"></i>
+                            </div>
+                            <h3 class="font-bold text-lg text-slate-800" x-text="tech.title"></h3>
+                            <p class="text-xs font-bold text-emerald-600 mb-2" x-text="tech.stack"></p>
+                            <p class="text-sm text-slate-500 leading-relaxed" x-text="tech.desc"></p>
+                        </div>
+                    </template>
+                </div>
+                <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+                    <h3 class="font-bold text-lg text-slate-800 mb-4">💰 Estimasi Biaya Operasional Bulanan</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-slate-50 border-b border-slate-200"><tr>
+                                <th class="text-left px-4 py-2.5 text-xs font-bold text-slate-500 uppercase">Komponen</th>
+                                <th class="text-left px-4 py-2.5 text-xs font-bold text-slate-500 uppercase">Layanan</th>
+                                <th class="text-right px-4 py-2.5 text-xs font-bold text-slate-500 uppercase">Biaya/Bulan</th>
+                            </tr></thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <tr><td class="px-4 py-3">Hosting & Domain</td><td class="px-4 py-3 text-slate-500">Vercel Pro + domain .id</td><td class="px-4 py-3 text-right font-medium">Rp 250.000</td></tr>
+                                <tr><td class="px-4 py-3">Database</td><td class="px-4 py-3 text-slate-500">Supabase Pro</td><td class="px-4 py-3 text-right font-medium">Rp 375.000</td></tr>
+                                <tr><td class="px-4 py-3">WhatsApp API</td><td class="px-4 py-3 text-slate-500">Fonnte Basic</td><td class="px-4 py-3 text-right font-medium">Rp 50.000</td></tr>
+                                <tr><td class="px-4 py-3">Image Storage</td><td class="px-4 py-3 text-slate-500">Cloudinary Free</td><td class="px-4 py-3 text-right font-medium">Rp 0</td></tr>
+                                <tr class="bg-emerald-50"><td class="px-4 py-3 font-bold text-slate-800" colspan="2">Total Estimasi</td><td class="px-4 py-3 text-right font-extrabold text-emerald-700">Rp 675.000/bulan</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== WORKFLOW ===== -->
+            <div x-show="activeTab === 'workflow'" x-transition:enter="transition-opacity duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-cloak>
+                <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+                    <h3 class="font-bold text-xl text-slate-800 mb-6">Alur Kerja Transaksi Sewa</h3>
+                    <div class="space-y-0">
+                        <template x-for="(step, idx) in workflowSteps" :key="step.no">
+                            <div class="flow-line relative pl-16 pb-6" :class="idx === workflowSteps.length - 1 ? 'pb-0' : ''">
+                                <div class="absolute left-0 top-0 w-12 h-12 rounded-full text-white flex items-center justify-center font-extrabold text-lg shadow-lg z-10" :style="`background: ${step.color}`" x-text="step.no"></div>
+                                <div class="rounded-2xl p-4 border" :style="`background: ${step.bg}; border-color: ${step.border}`">
+                                    <div class="flex items-start justify-between mb-2 flex-wrap gap-2">
+                                        <h4 class="font-bold text-slate-800" x-text="step.title"></h4>
+                                        <span class="text-xs px-2 py-1 rounded-full font-semibold" :style="`background: ${step.border}40; color: ${step.color}`" x-text="step.actor"></span>
+                                    </div>
+                                    <p class="text-sm text-slate-600 leading-relaxed" x-text="step.desc"></p>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== FEATURES ===== -->
+            <div x-show="activeTab === 'features'" x-transition:enter="transition-opacity duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-cloak>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                    <template x-for="feat in superFeatures" :key="feat.title">
+                        <div class="rounded-2xl p-5 text-white" :style="`background: linear-gradient(135deg, ${feat.from}, ${feat.to})`">
+                            <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-2xl mb-4"><i :class="feat.icon"></i></div>
+                            <h3 class="font-extrabold text-xl mb-2" x-text="feat.title"></h3>
+                            <p class="text-sm opacity-80 mb-4" x-text="feat.desc"></p>
+                            <div class="bg-white/10 rounded-xl p-3 space-y-1.5">
+                                <template x-for="point in feat.points" :key="point">
+                                    <div class="flex items-start gap-2 text-sm">
+                                        <i class="fas fa-check text-xs mt-1 opacity-80"></i>
+                                        <span x-text="point"></span>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm mb-4">
+                    <h3 class="font-bold text-lg text-slate-800 mb-4"><i class="fas fa-user-shield text-emerald-600 mr-2"></i>Multi-User Role System</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="border-2 border-emerald-200 rounded-2xl p-5 bg-emerald-50">
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="px-3 py-1 bg-emerald-600 text-white text-xs rounded-lg font-extrabold">ADMIN</span>
+                                <span class="font-bold text-slate-800">Full Access</span>
+                            </div>
+                            <ul class="text-sm text-slate-700 space-y-2">
+                                <li class="flex items-center gap-2"><i class="fas fa-check text-emerald-600 text-xs"></i>Lihat & edit harga modal barang</li>
+                                <li class="flex items-center gap-2"><i class="fas fa-check text-emerald-600 text-xs"></i>Akses laporan keuangan lengkap</li>
+                                <li class="flex items-center gap-2"><i class="fas fa-check text-emerald-600 text-xs"></i>Kelola user & setting sistem</li>
+                                <li class="flex items-center gap-2"><i class="fas fa-check text-emerald-600 text-xs"></i>Hapus transaksi & data master</li>
+                                <li class="flex items-center gap-2"><i class="fas fa-check text-emerald-600 text-xs"></i>Export laporan Excel/PDF</li>
+                            </ul>
+                        </div>
+                        <div class="border-2 border-blue-200 rounded-2xl p-5 bg-blue-50">
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="px-3 py-1 bg-blue-600 text-white text-xs rounded-lg font-extrabold">STAFF</span>
+                                <span class="font-bold text-slate-800">Operasional</span>
+                            </div>
+                            <ul class="text-sm text-slate-700 space-y-2">
+                                <li class="flex items-center gap-2"><i class="fas fa-check text-blue-600 text-xs"></i>Input & proses transaksi baru</li>
+                                <li class="flex items-center gap-2"><i class="fas fa-check text-blue-600 text-xs"></i>Cek stok & kondisi barang</li>
+                                <li class="flex items-center gap-2"><i class="fas fa-check text-blue-600 text-xs"></i>Proses check-out & check-in</li>
+                                <li class="flex items-center gap-2"><i class="fas fa-check text-blue-600 text-xs"></i>Kirim notifikasi WA manual</li>
+                                <li class="flex items-center gap-2"><i class="fas fa-times text-rose-400 text-xs"></i>Tidak bisa lihat harga modal</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gradient-to-r from-slate-800 to-slate-900 rounded-2xl p-6 text-white">
+                    <h3 class="font-bold text-lg mb-4"><i class="fas fa-lightbulb text-amber-400 mr-2"></i>Roadmap & Saran Pengembangan</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <template x-for="idea in roadmap" :key="idea.title">
+                            <div class="bg-white/10 hover:bg-white/15 rounded-xl p-4 transition cursor-default">
+                                <h4 class="font-semibold text-amber-400 mb-1.5" x-text="idea.title"></h4>
+                                <p class="text-sm text-slate-300 leading-relaxed" x-text="idea.desc"></p>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+</div>
+
+<script>
+function app() {
+    return {
+        activeTab: 'dashboard',
+        sidebarOpen: false,
+        showNotif: false,
+        toasts: [],
+        toastCounter: 0,
+
+        // ---- DATA ----
+        items: [
+            { id: 1, sku: 'TND-001', name: 'Tenda Kapasitas 4P Consina', category: 'Tenda', variation: 'Standard', rental_price: 75000, purchase_price: 850000, total_stock: 5, available_stock: 2, condition: 'Layak Pakai', notes: '' },
+            { id: 2, sku: 'TND-002', name: 'Tenda Kapasitas 2P Eiger', category: 'Tenda', variation: 'Compact', rental_price: 55000, purchase_price: 650000, total_stock: 4, available_stock: 1, condition: 'Layak Pakai', notes: '' },
+            { id: 3, sku: 'CRR-012', name: 'Carrier 60L Eiger', category: 'Carrier', variation: 'Size L', rental_price: 50000, purchase_price: 650000, total_stock: 8, available_stock: 2, condition: 'Layak Pakai', notes: '' },
+            { id: 4, sku: 'CRR-013', name: 'Carrier 45L Deuter', category: 'Carrier', variation: 'Size M', rental_price: 40000, purchase_price: 520000, total_stock: 6, available_stock: 4, condition: 'Baru', notes: '' },
+            { id: 5, sku: 'SLB-004', name: 'Sleeping Bag -5°C Consina', category: 'Sleeping Bag', variation: 'Winter', rental_price: 35000, purchase_price: 350000, total_stock: 10, available_stock: 2, condition: 'Layak Pakai', notes: '' },
+            { id: 6, sku: 'SEP-009', name: 'Sepatu Hiking Consina 42', category: 'Sepatu', variation: 'Size 42', rental_price: 40000, purchase_price: 480000, total_stock: 4, available_stock: 0, condition: 'Perlu Perbaikan', notes: 'Sol mulai lepas' },
+            { id: 7, sku: 'KMP-003', name: 'Kompor Portable + Gas', category: 'Kompor', variation: 'Standard', rental_price: 25000, purchase_price: 180000, total_stock: 12, available_stock: 8, condition: 'Layak Pakai', notes: '' },
+            { id: 8, sku: 'MTR-001', name: 'Matras Sleeping Pad', category: 'Matras', variation: 'Standard', rental_price: 15000, purchase_price: 120000, total_stock: 15, available_stock: 9, condition: 'Layak Pakai', notes: '' },
+        ],
+        transactions: [
+            { id: 'TRX-2401-001', name: 'Budi Santoso', phone: '628123456789', pickup: '20 Jan 2024', return: '24 Jan 2024', items: 'Tenda 4P, Carrier 60L', total: 500000, status: 'Sedang Disewa', penalty: 0 },
+            { id: 'TRX-2401-002', name: 'Siti Rahma', phone: '628571234567', pickup: '21 Jan 2024', return: '25 Jan 2024', items: 'Sleeping Bag x2', total: 140000, status: 'Booked', penalty: 0 },
+            { id: 'TRX-2401-003', name: 'Agus Wibowo', phone: '628789876543', pickup: '15 Jan 2024', return: '19 Jan 2024', items: 'Kompor + Matras', total: 180000, status: 'Sudah Dikembalikan', penalty: 0 },
+            { id: 'TRX-2401-004', name: 'Dewi Lestari', phone: '628215678123', pickup: '22 Jan 2024', return: '26 Jan 2024', items: 'Tenda 2P, Sepatu 42', total: 290000, status: 'Terlambat', penalty: 50000 },
+            { id: 'TRX-2401-005', name: 'Reza Pratama', phone: '628119876543', pickup: '18 Jan 2024', return: '22 Jan 2024', items: 'Carrier 45L, Sleeping Bag', total: 300000, status: 'Sudah Dikembalikan', penalty: 0 },
+        ],
+        customers: [
+            { id: 1, name: 'Budi Santoso', phone: '0812-3456-789', id_type: 'KTP', id_number: '3174xxx', total_rentals: 5, tier: 'Silver', total_spent: 2100000 },
+            { id: 2, name: 'Siti Rahma', phone: '0857-1234-567', id_type: 'KTM', id_number: '1901xxx', total_rentals: 2, tier: 'Bronze', total_spent: 560000 },
+            { id: 3, name: 'Agus Wibowo', phone: '0878-9876-543', id_type: 'KTP', id_number: '3201xxx', total_rentals: 8, tier: 'Gold', total_spent: 4800000 },
+            { id: 4, name: 'Dewi Lestari', phone: '0821-5678-123', id_type: 'SIM', id_number: 'B-xxx', total_rentals: 3, tier: 'Bronze', total_spent: 850000 },
+            { id: 5, name: 'Reza Pratama', phone: '0811-9876-543', id_type: 'KTP', id_number: '3173xxx', total_rentals: 6, tier: 'Silver', total_spent: 3100000 },
+        ],
+        notifications: [
+            { id: 1, type: 'danger', title: 'Dewi Lestari Terlambat', msg: 'Tenda 2P belum dikembalikan, +1 hari', read: false },
+            { id: 2, type: 'warning', title: 'Stok Sepatu Habis', msg: 'SEP-009 ukuran 42 sudah 0 unit', read: false },
+            { id: 3, type: 'warning', title: 'Stok Tenda Menipis', msg: 'TND-001 tersisa 2 dari 5 unit', read: true },
+            { id: 4, type: 'info', title: 'Transaksi Baru', msg: 'TRX-2401-005 berhasil diselesaikan', read: true },
+        ],
+        categories: ['Tenda', 'Carrier', 'Sleeping Bag', 'Sepatu', 'Kompor', 'Matras', 'Aksesoris'],
+
+        // ---- FORM STATE ----
+        modals: { item: false, deleteConfirm: false, txDetail: false, newTx: false, waPreview: false },
+        editingItem: null,
+        deleteTarget: null,
+        selectedTx: null,
+        waTarget: null,
+        waMessage: '',
+        itemForm: { name: '', sku: '', category: '', rental_price: 0, purchase_price: 0, total_stock: 1, available_stock: 1, condition: 'Layak Pakai', variation: '', notes: '' },
+        txForm: { customerName: '', phone: '', idType: 'KTP', idNumber: '', pickupDate: '', returnDate: '', items: [], paymentMethod: 'Cash', paymentStatus: 'Lunas', notes: '' },
+        txFilter: '',
+        masterSearch: '',
+        masterCatFilter: '',
+        masterCondFilter: '',
+        customerSearch: '',
+        customerTierFilter: '',
+
+        // ---- COMPUTED ----
+        get tabTitle() {
+            const m = { dashboard: 'Dashboard Ringkasan', master: 'Master Data Inventaris', transaksi: 'Log Transaksi Sewa', customers: 'Database Customer', database: 'Struktur Database', techstack: 'Rekomendasi Tech Stack', workflow: 'Alur Kerja Transaksi', features: 'Fitur Super & Improvement' };
+            return m[this.activeTab] || '';
+        },
+        get tabSubtitle() {
+            const m = { dashboard: 'Pantau performa rental secara real-time', master: 'Kelola barang, stok, dan harga', transaksi: 'Catat semua aktivitas peminjaman', customers: 'Data penyewa & loyalty program', database: 'Rancangan tabel & relasi database', techstack: 'Teknologi untuk skalabilitas & maintenance', workflow: 'Flow dari booking hingga barang kembali', features: 'Fitur lanjutan untuk sistem profesional' };
+            return m[this.activeTab] || '';
+        },
+        get unreadNotif() { return this.notifications.filter(n => !n.read).length; },
+        get lowStockItems() { return this.items.filter(i => i.available_stock <= 2); },
+        get dueTodayTx() { return this.transactions.filter(t => t.status === 'Sedang Disewa' || t.status === 'Terlambat'); },
+        get todayRevenue() { return this.transactions.filter(t => t.status !== 'Booked').reduce((s, t) => s + t.total, 0); },
+        get filteredItems() {
+            return this.items.filter(i => {
+                const q = this.masterSearch.toLowerCase();
+                const matchQ = !q || i.name.toLowerCase().includes(q) || i.sku.toLowerCase().includes(q) || i.category.toLowerCase().includes(q);
+                const matchCat = !this.masterCatFilter || i.category === this.masterCatFilter;
+                const matchCond = !this.masterCondFilter || i.condition === this.masterCondFilter;
+                return matchQ && matchCat && matchCond;
+            });
+        },
+        get filteredTx() {
+            return this.transactions.filter(t => !this.txFilter || t.status === this.txFilter);
+        },
+        get filteredCustomers() {
+            return this.customers.filter(c => {
+                const q = this.customerSearch.toLowerCase();
+                const matchQ = !q || c.name.toLowerCase().includes(q) || c.phone.includes(q);
+                const matchTier = !this.customerTierFilter || c.tier === this.customerTierFilter;
+                return matchQ && matchTier;
+            });
+        },
+        get txDays() {
+            if (!this.txForm.pickupDate || !this.txForm.returnDate) return 4;
+            const d1 = new Date(this.txForm.pickupDate), d2 = new Date(this.txForm.returnDate);
+            const diff = Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24));
+            return diff > 0 ? diff : 1;
+        },
+        get txSubtotal() {
+            return this.txForm.items.reduce((s, i) => s + (i.price * i.qty * this.txDays), 0);
+        },
+        get txDeposit() { return Math.round(this.txSubtotal * 0.3); },
+        get chartData() {
+            const vals = [18, 24, 16, 30, 28, 35, 22];
+            const max = Math.max(...vals);
+            const labels = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
+            return vals.map((v, i) => ({ val: v, label: labels[i], pct: Math.round((v / max) * 100) }));
+        },
+        get categoryStats() {
+            return [
+                { name: 'Tenda', pct: 42, color: '#10b981' },
+                { name: 'Carrier', pct: 28, color: '#3b82f6' },
+                { name: 'Sleeping Bag', pct: 18, color: '#f59e0b' },
+                { name: 'Lainnya', pct: 12, color: '#94a3b8' },
+            ];
+        },
+
+        // ---- STATIC DATA ----
+        dbTables: [
+            { name: 'users', tag: 'Master', color: '#334155', icon: 'fas fa-users', highlight: false, columns: [
+                { name: 'id', type: 'UUID', pk: true }, { name: 'username', type: 'VARCHAR(50)' },
+                { name: 'email', type: 'VARCHAR(100)' }, { name: 'password_hash', type: 'VARCHAR(255)' },
+                { name: 'role', type: 'ENUM(admin,staff)' }, { name: 'is_active', type: 'BOOLEAN' }
+            ]},
+            { name: 'items', tag: 'Master', color: '#059669', icon: 'fas fa-box', highlight: true, columns: [
+                { name: 'id', type: 'UUID', pk: true }, { name: 'sku', type: 'VARCHAR(20) UNIQUE' },
+                { name: 'name', type: 'VARCHAR(100)' }, { name: 'category', type: 'VARCHAR(50)' },
+                { name: 'total_stock', type: 'INT' }, { name: 'available_stock', type: 'INT' },
+                { name: 'rental_price', type: 'DECIMAL(10,2)' }, { name: 'purchase_price', type: 'DECIMAL(10,2)' },
+                { name: 'condition', type: 'ENUM(4 status)' }
+            ]},
+            { name: 'customers', tag: 'Master', color: '#2563eb', icon: 'fas fa-user-friends', highlight: false, columns: [
+                { name: 'id', type: 'UUID', pk: true }, { name: 'full_name', type: 'VARCHAR(100)' },
+                { name: 'phone', type: 'VARCHAR(20)' }, { name: 'whatsapp', type: 'VARCHAR(20)' },
+                { name: 'id_type', type: 'ENUM(KTP/SIM/KTM)' }, { name: 'id_number', type: 'VARCHAR(30)' },
+                { name: 'total_rentals', type: 'INT (cache)' }, { name: 'loyalty_tier', type: 'ENUM(3 tier)' }
+            ]},
+            { name: 'transactions', tag: 'Transaksi', color: '#059669', icon: 'fas fa-receipt', highlight: true, columns: [
+                { name: 'id', type: 'UUID', pk: true }, { name: 'customer_id', type: 'FK → customers', fk: true },
+                { name: 'staff_id', type: 'FK → users', fk: true }, { name: 'pickup_date', type: 'TIMESTAMP' },
+                { name: 'return_date', type: 'TIMESTAMP' }, { name: 'actual_return_date', type: 'TIMESTAMP (null)' },
+                { name: 'subtotal', type: 'DECIMAL(10,2)' }, { name: 'deposit_amount', type: 'DECIMAL(10,2)' },
+                { name: 'penalty_amount', type: 'DECIMAL(10,2)' }, { name: 'status', type: 'ENUM(4 status)' }
+            ]},
+            { name: 'transaction_items', tag: 'Detail', color: '#7c3aed', icon: 'fas fa-list', highlight: false, columns: [
+                { name: 'id', type: 'UUID', pk: true }, { name: 'transaction_id', type: 'FK → transactions', fk: true },
+                { name: 'item_id', type: 'FK → items', fk: true }, { name: 'quantity', type: 'INT' },
+                { name: 'unit_price', type: 'DECIMAL(10,2)' }, { name: 'subtotal', type: 'DECIMAL(10,2)' },
+                { name: 'condition_out', type: 'TEXT' }, { name: 'condition_in', type: 'TEXT (null)' }
+            ]},
+            { name: 'payments', tag: 'Keuangan', color: '#475569', icon: 'fas fa-money-bill-wave', highlight: false, columns: [
+                { name: 'id', type: 'UUID', pk: true }, { name: 'transaction_id', type: 'FK → transactions', fk: true },
+                { name: 'amount', type: 'DECIMAL(10,2)' }, { name: 'method', type: 'ENUM(Cash/QRIS/TF)' },
+                { name: 'type', type: 'ENUM(dp/sewa/denda/deposit)' }, { name: 'paid_at', type: 'TIMESTAMP' }
+            ]},
+            { name: 'audit_logs', tag: 'Tracking', color: '#475569', icon: 'fas fa-history', highlight: false, columns: [
+                { name: 'id', type: 'UUID', pk: true }, { name: 'user_id', type: 'FK → users', fk: true },
+                { name: 'action', type: 'VARCHAR' }, { name: 'entity_type', type: 'VARCHAR' },
+                { name: 'entity_id', type: 'UUID' }, { name: 'changes', type: 'JSONB' },
+                { name: 'created_at', type: 'TIMESTAMP' }
+            ]},
+        ],
+        techStack: [
+            { title: 'Frontend', stack: 'Next.js 14 + React + Tailwind CSS', desc: 'SSR untuk performa cepat. Tailwind untuk styling konsisten. Support PWA agar bisa diinstall di HP staff.', icon: 'fab fa-react', bg: '#dbeafe', color: '#2563eb' },
+            { title: 'Database', stack: 'PostgreSQL (Supabase)', desc: 'Relational DB kokoh untuk data transaksi. Supabase menyediakan hosting murah, realtime subscription, dan auth bawaan.', icon: 'fas fa-database', bg: '#d1fae5', color: '#059669' },
+            { title: 'ORM & Backend', stack: 'Prisma + Next.js API Routes', desc: 'Prisma memberikan type-safe queries dan migration mudah. API routes menyederhanakan deployment serverless.', icon: 'fas fa-code', bg: '#ede9fe', color: '#7c3aed' },
+            { title: 'WhatsApp Gateway', stack: 'Fonnte / Twilio / Baileys', desc: 'Fonnte (murah, lokal) untuk reminder H-1. Twilio untuk target internasional. Baileys self-hosted gratis.', icon: 'fab fa-whatsapp', bg: '#dcfce7', color: '#16a34a' },
+            { title: 'Storage & Hosting', stack: 'Vercel + Supabase Storage', desc: 'Vercel free tier cukup skala awal. Supabase Storage untuk foto barang. Alternatif: Cloudinary free tier.', icon: 'fas fa-cloud', bg: '#fef3c7', color: '#d97706' },
+            { title: 'Auth & Security', stack: 'NextAuth.js / Supabase Auth', desc: 'Multi-role (Admin/Staff) dengan middleware protection. Password hashing bcrypt. JWT session management.', icon: 'fas fa-lock', bg: '#fee2e2', color: '#dc2626' },
+        ],
+        workflowSteps: [
+            { no: 1, title: 'Pemesanan / Booking', actor: 'Staff / Customer', color: '#10b981', bg: '#ecfdf5', border: '#86efac', desc: 'Customer datang/chat → Staff cek ketersediaan stok di sistem → Pilih item, qty, tanggal ambil & kembali (default H+4).' },
+            { no: 2, title: 'Validasi Identitas & Deposit', actor: 'Staff', color: '#3b82f6', bg: '#eff6ff', border: '#93c5fd', desc: 'Input data customer (auto-fill jika lama) → Foto KTP/SIM → Hitung total sewa + deposit (otomatis) → Customer bayar DP/Deposit.' },
+            { no: 3, title: 'Pengambilan Barang (Check-out)', actor: 'Staff', color: '#7c3aed', bg: '#f5f3ff', border: '#c4b5fd', desc: 'Staff cek kondisi barang bersama customer → Foto kondisi → Input kondisi keluar → Status berubah jadi "Sedang Disewa" → Stok berkurang otomatis → Kirim WA konfirmasi.' },
+            { no: 4, title: 'Reminder Otomatis (H-1)', actor: 'System', color: '#d97706', bg: '#fffbeb', border: '#fcd34d', desc: 'Sistem otomatis kirim WA ke customer: "Halo [Nama], pengingat barang sewa Anda jatuh tempo besok [Tanggal]. Mohon dikembalikan tepat waktu."' },
+            { no: 5, title: 'Pengembalian & Inspeksi (Check-in)', actor: 'Staff', color: '#e11d48', bg: '#fff1f2', border: '#fda4af', desc: 'Staff cek kondisi barang → Bandingkan dengan foto saat keluar → Sistem hitung denda otomatis jika terlambat/rusak → Update status "Sudah Dikembalikan" → Stok kembali bertambah.' },
+            { no: 6, title: 'Pelunasan & Penyelesaian', actor: 'Staff / Admin', color: '#334155', bg: '#f8fafc', border: '#cbd5e1', desc: 'Hitung total akhir (Sewa + Denda − Deposit) → Customer pelunasan atau terima refund deposit → Cetak struk → Kirim WA struk digital → Transaksi selesai.' },
+        ],
+        superFeatures: [
+            { title: 'Manajemen Deposit & Denda', desc: 'Sistem otomatis menghitung deposit & denda keterlambatan harian.', icon: 'fas fa-coins', from: '#059669', to: '#0d9488', points: ['Deposit default 30-50% nilai barang', 'Denda telat Rp 50.000/hari', 'Denda rusak sesuai persentase kerusakan', 'Denda hilang 100% harga beli'] },
+            { title: 'Otomatisasi WhatsApp', desc: 'Notifikasi real-time ke customer di setiap tahapan transaksi.', icon: 'fab fa-whatsapp', from: '#2563eb', to: '#4f46e5', points: ['Booking confirmation + total bayar', 'Reminder H-1 sebelum jatuh tempo', 'Notifikasi barang siap diambil', 'Struk digital & info denda (jika ada)'] },
+            { title: 'Customer Database & Loyalty', desc: 'Simpan riwayat customer untuk pengalaman sewa yang lebih cepat.', icon: 'fas fa-user-clock', from: '#7c3aed', to: '#db2777', points: ['Auto-fill saat input nomor HP/nama', 'Loyalty tier (Bronze/Silver/Gold)', 'Discount khusus member Gold', 'Blacklist customer bermasalah'] },
+            { title: 'Laporan & Analitik', desc: 'Export laporan bulanan untuk evaluasi bisnis & keputusan stok.', icon: 'fas fa-chart-pie', from: '#d97706', to: '#ea580c', points: ['Export Excel/PDF (Keuangan, Stok)', 'Top 10 barang paling disewa', 'Tingkat kerusakan & depresiasi', 'ROI per item & break-even point'] },
+        ],
+        roadmap: [
+            { title: '1. QR Code / Barcode Scanner', desc: 'Generate QR per item. Staff scan saat check-out/check-in untuk mempercepat input & hindari kesalahan SKU.' },
+            { title: '2. Maintenance Schedule', desc: 'Auto-flag barang untuk perawatan setelah N kali sewa. Cegah barang rusak saat disewa customer.' },
+            { title: '3. Paket Bundle & Promo', desc: 'Fitur bundling (Tenda+Carrier+SB = 20% off). Tingkatkan average order value dan tarik customer baru.' },
+            { title: '4. Asuransi Opsional', desc: 'Tawarkan asuransi kerusakan 10% dari total sewa. Revenue tambahan & customer lebih tenang.' },
+            { title: '5. Booking Online (Customer Portal)', desc: 'Halaman publik untuk cek stok real-time & booking mandiri. Kurangi beban admin via chat.' },
+            { title: '6. Integrasi Accounting', desc: 'Export data ke format compatible dengan Jurnal.id / Accurate untuk pembukuan yang rapi.' },
+        ],
+
+        // ---- METHODS ----
+        init() {
+            const today = new Date();
+            const pickupDate = today.toISOString().split('T')[0];
+            const returnDate = new Date(today.setDate(today.getDate() + 4)).toISOString().split('T')[0];
+            this.txForm.pickupDate = pickupDate;
+            this.txForm.returnDate = returnDate;
+        },
+
+        showToast(msg, type = 'success') {
+            const id = ++this.toastCounter;
+            this.toasts.push({ id, msg, type });
+            setTimeout(() => { this.toasts = this.toasts.filter(t => t.id !== id); }, 3000);
+        },
+
+        markAllRead() {
+            this.notifications.forEach(n => n.read = true);
+            this.showNotif = false;
+        },
+
+        getCatIcon(cat) {
+            const m = { 'Tenda': 'fas fa-campground', 'Carrier': 'fas fa-backpack', 'Sleeping Bag': 'fas fa-bed', 'Sepatu': 'fas fa-shoe-prints', 'Kompor': 'fas fa-fire', 'Matras': 'fas fa-layer-group', 'Aksesoris': 'fas fa-tools' };
+            return (m[cat] || 'fas fa-box') + ' text-sm';
+        },
+
+        stringToColor(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            const colors = ['#10b981','#3b82f6','#8b5cf6','#f59e0b','#ef4444','#06b6d4','#ec4899'];
+            return colors[Math.abs(hash) % colors.length];
+        },
+
+        // ITEM CRUD
+        openAddItem() {
+            this.editingItem = null;
+            this.itemForm = { name: '', sku: '', category: '', rental_price: 0, purchase_price: 0, total_stock: 1, available_stock: 1, condition: 'Layak Pakai', variation: '', notes: '' };
+            this.modals.item = true;
+        },
+        openEditItem(item) {
+            this.editingItem = item;
+            this.itemForm = { ...item };
+            this.modals.item = true;
+        },
+        saveItem() {
+            if (!this.itemForm.name || !this.itemForm.sku || !this.itemForm.category) {
+                this.showToast('Nama, SKU, dan Kategori wajib diisi!', 'error'); return;
+            }
+            if (this.editingItem) {
+                const idx = this.items.findIndex(i => i.id === this.editingItem.id);
+                if (idx !== -1) this.items[idx] = { ...this.editingItem, ...this.itemForm };
+                this.showToast('Item berhasil diperbarui!', 'success');
+            } else {
+                const newId = Math.max(...this.items.map(i => i.id)) + 1;
+                this.items.push({ id: newId, ...this.itemForm });
+                this.showToast('Item baru berhasil ditambahkan!', 'success');
+            }
+            this.modals.item = false;
+        },
+        askDeleteItem(item) {
+            this.deleteTarget = item;
+            this.modals.deleteConfirm = true;
+        },
+        confirmDelete() {
+            this.items = this.items.filter(i => i.id !== this.deleteTarget.id);
+            this.showToast(`${this.deleteTarget.name} dihapus`, 'success');
+            this.modals.deleteConfirm = false;
+            this.deleteTarget = null;
+        },
+
+        // TRANSACTION
+        openNewTx() {
+            const today = new Date();
+            this.txForm = {
+                customerName: '', phone: '', idType: 'KTP', idNumber: '',
+                pickupDate: today.toISOString().split('T')[0],
+                returnDate: new Date(today.getTime() + 4*24*60*60*1000).toISOString().split('T')[0],
+                items: [{ itemId: '', qty: 1, price: 0 }],
+                paymentMethod: 'Cash', paymentStatus: 'Lunas', notes: ''
+            };
+            this.modals.newTx = true;
+        },
+        updateTxItemPrice(idx) {
+            const itemId = parseInt(this.txForm.items[idx].itemId);
+            const found = this.items.find(i => i.id === itemId);
+            if (found) this.txForm.items[idx].price = found.rental_price;
+        },
+        saveTransaction() {
+            if (!this.txForm.customerName || !this.txForm.phone) {
+                this.showToast('Nama dan nomor WA customer wajib diisi!', 'error'); return;
+            }
+            const validItems = this.txForm.items.filter(i => i.itemId && i.qty > 0);
+            if (validItems.length === 0) {
+                this.showToast('Tambahkan minimal 1 item!', 'error'); return;
+            }
+            const newId = 'TRX-' + new Date().getFullYear().toString().slice(-2) + String(new Date().getMonth()+1).padStart(2,'0') + '-' + String(this.transactions.length + 1).padStart(3,'0');
+            const itemNames = validItems.map(i => this.items.find(it => it.id == i.itemId)?.name || '?').join(', ');
+            this.transactions.unshift({
+                id: newId, name: this.txForm.customerName, phone: this.txForm.phone.replace(/\D/g,''),
+                pickup: new Date(this.txForm.pickupDate).toLocaleDateString('id-ID', {day:'numeric',month:'short',year:'numeric'}),
+                return: new Date(this.txForm.returnDate).toLocaleDateString('id-ID', {day:'numeric',month:'short',year:'numeric'}),
+                items: itemNames, total: this.txSubtotal + this.txDeposit, status: 'Booked', penalty: 0
+            });
+            validItems.forEach(i => {
+                const idx = this.items.findIndex(it => it.id == i.itemId);
+                if (idx !== -1) this.items[idx].available_stock = Math.max(0, this.items[idx].available_stock - i.qty);
+            });
+            this.showToast(`Transaksi ${newId} berhasil disimpan!`, 'success');
+            this.modals.newTx = false;
+            this.activeTab = 'transaksi';
+        },
+        viewTxDetail(t) {
+            this.selectedTx = t;
+            this.modals.txDetail = true;
+        },
+        updateTxStatus(t) {
+            const flow = { 'Booked': 'Sedang Disewa', 'Sedang Disewa': 'Sudah Dikembalikan', 'Terlambat': 'Sudah Dikembalikan' };
+            const next = flow[t.status];
+            if (next) {
+                t.status = next;
+                this.showToast(`Status ${t.id} → ${next}`, 'success');
+            }
+        },
+
+        // WHATSAPP
+        sendWhatsApp(t) {
+            this.waTarget = t;
+            this.waMessage = `Halo *${t.name}* 👋\n\nIni adalah pengingat dari *Basecamp Rental*:\n\n📦 Item: ${t.items}\n📅 Jatuh Tempo: ${t.return}\n💰 Total: Rp ${t.total.toLocaleString()}\n${t.penalty ? '⚠️ Denda: Rp ' + t.penalty.toLocaleString() + '\n' : ''}\nMohon kembalikan barang tepat waktu ya. Terima kasih! 🙏\n\n_Basecamp Rental - Alat Hiking Terpercaya_`;
+            this.modals.waPreview = true;
+        },
+        openWhatsApp() {
+            const phone = this.waTarget?.phone?.replace(/\D/g, '') || '';
+            const msg = encodeURIComponent(this.waMessage);
+            window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+            this.modals.waPreview = false;
+            this.showToast('Membuka WhatsApp...', 'success');
+        },
+
+        // PRINT
+        printReceipt(t) {
+            const w = window.open('', '_blank', 'width=400,height=600');
+            w.document.write(`
+                <html><head><title>Struk - ${t.id}</title>
+                <style>body{font-family:monospace;padding:20px;max-width:300px;margin:0 auto;} h2{text-align:center;} hr{border:1px dashed #000;} .row{display:flex;justify-content:space-between;margin:4px 0;} .total{font-weight:bold;font-size:1.1em;border-top:2px solid #000;padding-top:8px;}</style>
+                </head><body>
+                <h2>⛰️ BASECAMP RENTAL</h2>
+                <p style="text-align:center;font-size:12px;">Jl. Pendakian No.1 | WA: 0812-xxxx</p>
+                <hr>
+                <p>ID: <strong>${t.id}</strong></p>
+                <p>Customer: ${t.name}</p>
+                <p>Ambil: ${t.pickup}</p>
+                <p>Kembali: ${t.return}</p>
+                <hr>
+                <p>Item: ${t.items}</p>
+                <hr>
+                <div class="row"><span>Subtotal</span><span>Rp ${t.total.toLocaleString()}</span></div>
+                <div class="row"><span>Deposit</span><span>Rp ${Math.round(t.total*0.3).toLocaleString()}</span></div>
+                ${t.penalty ? `<div class="row"><span>Denda</span><span>Rp ${t.penalty.toLocaleString()}</span></div>` : ''}
+                <div class="row total"><span>TOTAL</span><span>Rp ${(t.total + (t.penalty||0)).toLocaleString()}</span></div>
+                <hr>
+                <p style="text-align:center;font-size:11px;">Terima kasih telah menyewa!<br>Kembalikan barang tepat waktu 🙏</p>
+                <script>window.print();<\/script>
+                </body></html>
+            `);
+            w.document.close();
+            this.showToast('Membuka halaman cetak...', 'info');
+        }
+    }
+}
+</script>
+</body>
+</html>
