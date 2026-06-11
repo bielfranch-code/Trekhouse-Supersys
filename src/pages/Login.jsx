@@ -15,8 +15,8 @@ export default function Login() {
     setLoading(true)
     setError('')
     // small delay for a smoother UX feel
-    setTimeout(() => {
-      const ok = doLogin(username, password)
+    setTimeout(async () => {
+      const ok = await doLogin(username, password)
       if (!ok) { setError('Username atau password salah.'); setLoading(false) }
     }, 450)
   }
