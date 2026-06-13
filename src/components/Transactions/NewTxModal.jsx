@@ -52,6 +52,7 @@ export default function NewTxModal({ open, onClose, onSave }) {
     const itemNames = validItems.map(i => items.find(it => it.id === +i.itemId)?.name || '?').join(', ')
     const tx = {
       id, name: form.customerName, phone: form.phone.replace(/\D/g,''),
+      idType: form.idType, idNumber: form.idNumber,
       pickup: new Date(form.pickupDate).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}),
       return: new Date(form.returnDate).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}),
       items: itemNames, itemIds: validItems.map(i => +i.itemId), itemQtys: validItems.map(i => i.qty),

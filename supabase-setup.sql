@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS items (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS transactions (
+CREATE TABLE IF NOT EXISTS rentals (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   phone TEXT NOT NULL,
@@ -67,14 +67,14 @@ CREATE TABLE IF NOT EXISTS notifications (
 -- 2. DISABLE ROW LEVEL SECURITY (re-enable with proper auth later)
 ALTER TABLE accounts DISABLE ROW LEVEL SECURITY;
 ALTER TABLE items DISABLE ROW LEVEL SECURITY;
-ALTER TABLE transactions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE rentals DISABLE ROW LEVEL SECURITY;
 ALTER TABLE customers DISABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications DISABLE ROW LEVEL SECURITY;
 
 -- 3. ENABLE REAL-TIME ON ALL TABLES
 ALTER PUBLICATION supabase_realtime ADD TABLE accounts;
 ALTER PUBLICATION supabase_realtime ADD TABLE items;
-ALTER PUBLICATION supabase_realtime ADD TABLE transactions;
+ALTER PUBLICATION supabase_realtime ADD TABLE rentals;
 ALTER PUBLICATION supabase_realtime ADD TABLE customers;
 ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
 
@@ -97,7 +97,7 @@ INSERT INTO items (sku, name, category, variation, rental_price, purchase_price,
   ('MTR-001', 'Matras Sleeping Pad', 'Matras', 'Standard', 15000, 120000, 15, '');
 
 -- 6. SEED: Transactions
-INSERT INTO transactions (id, name, phone, pickup, return_date, items_text, item_ids, item_qtys, subtotal, penalty, status, return_note) VALUES
+INSERT INTO rentals (id, name, phone, pickup, return_date, items_text, item_ids, item_qtys, subtotal, penalty, status, return_note) VALUES
   ('TRX-2401-001', 'Budi Santoso', '628123456789', '20 Jan 2024', '24 Jan 2024', 'Tenda 4P Consina, Carrier 60L', ARRAY[1,3], ARRAY[1,1], 500000, 0, 'Sedang Disewa', ''),
   ('TRX-2401-002', 'Siti Rahma', '628571234567', '21 Jan 2024', '25 Jan 2024', 'Sleeping Bag x2', ARRAY[5], ARRAY[2], 140000, 0, 'Booked', ''),
   ('TRX-2401-003', 'Agus Wibowo', '628789876543', '15 Jan 2024', '19 Jan 2024', 'Kompor + Matras', ARRAY[7,8], ARRAY[1,1], 180000, 0, 'Sudah Dikembalikan', ''),

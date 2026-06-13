@@ -9,16 +9,21 @@ export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  function handleLogin() {
+  async function handleLogin() {
     if (loading) return
     if (!username || !password) { setError('Username dan password wajib diisi.'); return }
     setLoading(true)
     setError('')
+<<<<<<< HEAD
     // small delay for a smoother UX feel
     setTimeout(async () => {
       const ok = await doLogin(username, password)
       if (!ok) { setError('Username atau password salah.'); setLoading(false) }
     }, 450)
+=======
+    const ok = await doLogin(username, password)
+    if (!ok) { setError('Username atau password salah.'); setLoading(false) }
+>>>>>>> 22a0cc0 (Fix login)
   }
 
   function handleKey(e) { if (e.key === 'Enter') handleLogin() }

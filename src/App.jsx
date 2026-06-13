@@ -33,7 +33,12 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [accountsOpen, setAccountsOpen] = useState(false)
 
-  if (loading) return <LoadingScreen />
+  if (loading) return (
+    <>
+      <Toast />
+      <LoadingScreen />
+    </>
+  )
 
   if (!loggedIn) return (
     <>

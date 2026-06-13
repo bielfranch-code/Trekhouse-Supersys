@@ -62,7 +62,7 @@ export function AppProvider({ children }) {
   }
 
   const savedUser = loadSession()
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!!savedUser) // true only when auto-resuming session
   const [loggedIn, setLoggedIn] = useState(!!savedUser)
   const [currentUser, setCurrentUser] = useState(savedUser)
   const [accounts, setAccounts] = useState([])
@@ -100,6 +100,8 @@ export function AppProvider({ children }) {
 
   // ── Real-time subscriptions ────────────────────────────────────────────────
   useEffect(() => {
+    if (!loggedIn) return // Don't load data or subscribe when not logged in
+
     loadAll()
 
     const channel = supabase.channel('trekhouse-realtime')
@@ -132,7 +134,7 @@ export function AppProvider({ children }) {
 
     channelRef.current = channel
     return () => supabase.removeChannel(channel)
-  }, [])
+  }, [loggedIn])
 
   // ── Auth ───────────────────────────────────────────────────────────────────
   const doLogin = useCallback(async (username, password) => {
@@ -141,11 +143,12 @@ export function AppProvider({ children }) {
       .select('*')
       .eq('username', username)
       .eq('password', password)
-      .single()
+      .maybeSingle()
     if (data && !error) {
-      setCurrentUser(data)
-      setLoggedIn(true)
       localStorage.setItem(SESSION_KEY, JSON.stringify({ user: data, loginAt: Date.now() }))
+      setCurrentUser(data)
+      setLoading(true) // Show loading while initial data loads
+      setLoggedIn(true) // Triggers useEffect → loadAll()
       showToast(`Selamat datang, ${data.name}!`, 'success')
       return true
     }
