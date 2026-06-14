@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useApp } from '../../context/AppContext'
 
 function today() { return new Date().toISOString().split('T')[0] }
@@ -10,6 +10,94 @@ const EMPTY_FORM = () => ({
   items: [{ itemId:'', qty:1, price:0 }],
   paymentMethod:'Cash', paymentStatus:'Lunas', notes:''
 })
+
+function ItemSearchRow({ ti, idx, items, getAvailableStock, onChangeItem, onChangeQty, onRemove, txDays }) {
+  const [search, setSearch] = useState('')
+  const [open, setOpen] = useState(false)
+  const wrapRef = useRef()
+
+  const selectedItem = items.find(i => i.id === +ti.itemId)
+  const filtered = items
+    .filter(i => getAvailableStock(i) > 0 || ti.itemId == i.id)
+    .filter(i => !search || i.name.toLowerCase().includes(search.toLowerCase())
+      || i.sku.toLowerCase().includes(search.toLowerCase())
+      || (i.category || '').toLowerCase().includes(search.toLowerCase()))
+
+  useEffect(() => {
+    function onClick(e) { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [])
+
+  return (
+    <div className="flex gap-2 items-start bg-slate-50 rounded-xl p-2">
+      <div className="flex-1 min-w-0" ref={wrapRef}>
+        {/* Selected item pill or search trigger */}
+        {selectedItem && !open ? (
+          <button
+            type="button"
+            onClick={() => { setSearch(''); setOpen(true) }}
+            className="w-full text-left flex items-center gap-2 border border-emerald-200 bg-emerald-50 rounded-lg px-2 py-1.5"
+          >
+            <span className="flex-1 text-xs font-bold text-emerald-800 truncate">{selectedItem.name}</span>
+            <span className="text-[10px] text-emerald-600 whitespace-nowrap">Rp {selectedItem.rental_price.toLocaleString()}</span>
+            <i className="fas fa-pen text-[9px] text-emerald-400"></i>
+          </button>
+        ) : (
+          <input
+            autoFocus={open}
+            value={search}
+            onChange={e => { setSearch(e.target.value); setOpen(true) }}
+            onFocus={() => setOpen(true)}
+            placeholder="Cari nama, SKU, atau kategori..."
+            className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs bg-white transition"
+          />
+        )}
+        {/* Dropdown */}
+        {open && (
+          <div className="absolute z-50 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto w-72">
+            {filtered.length === 0 ? (
+              <p className="text-xs text-slate-400 text-center py-4">Tidak ada item</p>
+            ) : filtered.map(it => {
+              const avail = getAvailableStock(it)
+              return (
+                <button
+                  key={it.id}
+                  type="button"
+                  onClick={() => { onChangeItem(idx, it.id); setSearch(''); setOpen(false) }}
+                  className="w-full text-left px-3 py-2 hover:bg-emerald-50 border-b border-slate-50 last:border-0 transition"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-800 truncate">{it.name}</p>
+                      <p className="text-[10px] text-slate-400">{it.sku} · {it.category}{it.size ? ` · ${it.size}` : ''}{it.variation ? ` · ${it.variation}` : ''}</p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-xs font-bold text-emerald-700">Rp {it.rental_price.toLocaleString()}</p>
+                      <p className={`text-[10px] font-semibold ${avail === 0 ? 'text-rose-500' : 'text-slate-400'}`}>{avail} tersedia</p>
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+      <input
+        value={ti.qty}
+        onChange={e => onChangeQty(idx, e.target.value)}
+        type="number" min="1" max="20"
+        className="w-14 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-center transition flex-shrink-0"
+      />
+      <span className="text-xs text-slate-500 w-20 text-right shrink-0 pt-1.5">
+        Rp {(ti.price * ti.qty * txDays).toLocaleString()}
+      </span>
+      <button onClick={() => onRemove(idx)} className="p-1.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg flex-shrink-0">
+        <i className="fas fa-times text-xs"></i>
+      </button>
+    </div>
+  )
+}
 
 export default function NewTxModal({ open, onClose, onSave }) {
   const { items, getAvailableStock } = useApp()
@@ -103,19 +191,18 @@ export default function NewTxModal({ open, onClose, onSave }) {
 
           <div>
             <p className="text-xs font-extrabold text-slate-500 uppercase tracking-widest mb-2">Item Disewa</p>
-            <div className="space-y-2 mb-2">
+            <div className="space-y-2 mb-2 relative">
               {form.items.map((ti, idx) => (
-                <div key={idx} className="flex gap-2 items-center bg-slate-50 rounded-xl p-2">
-                  <select value={ti.itemId} onChange={e => updateItemPrice(idx, e.target.value)} className="flex-1 border border-slate-200 rounded-lg px-2 py-2 text-xs bg-white transition min-w-0">
-                    <option value="">-- Pilih Item --</option>
-                    {items.filter(i => getAvailableStock(i) > 0 || ti.itemId == i.id).map(it => (
-                      <option key={it.id} value={it.id}>{it.name} ({getAvailableStock(it)} avail) · Rp{it.rental_price.toLocaleString()}</option>
-                    ))}
-                  </select>
-                  <input value={ti.qty} onChange={e => updateItemQty(idx, e.target.value)} type="number" min="1" max="20" className="w-14 border border-slate-200 rounded-lg px-2 py-2 text-xs text-center transition" />
-                  <span className="text-xs text-slate-500 w-20 text-right shrink-0">Rp {(ti.price * ti.qty * txDays).toLocaleString()}</span>
-                  <button onClick={() => removeItem(idx)} className="p-1.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"><i className="fas fa-times text-xs"></i></button>
-                </div>
+                <ItemSearchRow
+                  key={idx}
+                  ti={ti} idx={idx}
+                  items={items}
+                  getAvailableStock={getAvailableStock}
+                  onChangeItem={updateItemPrice}
+                  onChangeQty={updateItemQty}
+                  onRemove={removeItem}
+                  txDays={txDays}
+                />
               ))}
             </div>
             <button onClick={addItemRow} className="w-full border-2 border-dashed border-slate-200 hover:border-emerald-400 text-slate-400 hover:text-emerald-600 rounded-xl py-2 text-xs font-bold transition">

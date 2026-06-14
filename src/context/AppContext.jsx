@@ -9,17 +9,21 @@ export const CATEGORIES = ['Tenda','Carrier','Sleeping Bag','Sepatu','Kompor','M
 function dbToTx(row) {
   return {
     id: row.id,
-    name: row.name,
+    name: row.customer_name,
     phone: row.phone,
-    pickup: row.pickup,
+    pickup: row.pickup_date,
     return: row.return_date,
-    items: row.items_text,
-    itemIds: row.item_ids || [],
-    itemQtys: row.item_qtys || [],
-    subtotal: row.subtotal,
-    penalty: row.penalty,
+    items: row.items_summary,
+    itemIds: [],
+    itemQtys: [],
+    subtotal: row.subtotal || 0,
+    penalty: row.penalty || 0,
     status: row.status,
     returnNote: row.return_note,
+    paymentMethod: row.payment_method,
+    paymentStatus: row.payment_status,
+    notes: row.notes,
+    createdBy: row.created_by,
     created_at: row.created_at,
   }
 }
@@ -27,17 +31,19 @@ function dbToTx(row) {
 function txToDb(tx) {
   return {
     id: tx.id,
-    name: tx.name,
+    customer_name: tx.name,
     phone: tx.phone,
-    pickup: tx.pickup,
+    pickup_date: tx.pickup,
     return_date: tx.return,
-    items_text: tx.items,
-    item_ids: tx.itemIds,
-    item_qtys: tx.itemQtys,
+    items_summary: tx.items,
     subtotal: tx.subtotal,
-    penalty: tx.penalty,
+    penalty: tx.penalty || 0,
     status: tx.status,
     return_note: tx.returnNote || '',
+    payment_method: tx.paymentMethod || '',
+    payment_status: tx.paymentStatus || '',
+    notes: tx.notes || '',
+    created_by: tx.createdBy || '',
   }
 }
 
@@ -69,7 +75,7 @@ export function AppProvider({ children }) {
   const [items, setItems] = useState([])
   const [transactions, setTransactions] = useState([])
   const [customers, setCustomers] = useState([])
-  const [notifications, setNotifications] = useState([])
+  const [notifications] = useState([])
   const [toasts, setToasts] = useState([])
   const channelRef = useRef(null)
 
@@ -83,18 +89,16 @@ export function AppProvider({ children }) {
   // ── Load all data ──────────────────────────────────────────────────────────
   async function loadAll() {
     setLoading(true)
-    const [accs, its, txs, custs, notifs] = await Promise.all([
+    const [accs, its, txs, custs] = await Promise.all([
       supabase.from('accounts').select('*').order('id'),
       supabase.from('items').select('*').order('id'),
-      supabase.from('rentals').select('*').order('created_at', { ascending: false }),
+      supabase.from('transactions').select('*').order('created_at', { ascending: false }),
       supabase.from('customers').select('*').order('id'),
-      supabase.from('notifications').select('*').order('created_at', { ascending: false }),
     ])
     if (accs.data) setAccounts(accs.data)
     if (its.data) setItems(its.data)
     if (txs.data) setTransactions(txs.data.map(dbToTx))
     if (custs.data) setCustomers(custs.data)
-    if (notifs.data) setNotifications(notifs.data)
     setLoading(false)
   }
 
@@ -110,7 +114,7 @@ export function AppProvider({ children }) {
         if (eventType === 'UPDATE') setItems(prev => prev.map(i => i.id === row.id ? row : i))
         if (eventType === 'DELETE') setItems(prev => prev.filter(i => i.id !== old.id))
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'rentals' }, ({ eventType, new: row, old }) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, ({ eventType, new: row, old }) => {
         if (eventType === 'INSERT') setTransactions(prev => [dbToTx(row), ...prev])
         if (eventType === 'UPDATE') setTransactions(prev => prev.map(t => t.id === row.id ? dbToTx(row) : t))
         if (eventType === 'DELETE') setTransactions(prev => prev.filter(t => t.id !== old.id))
@@ -125,11 +129,6 @@ export function AppProvider({ children }) {
         if (eventType === 'UPDATE') setAccounts(prev => prev.map(a => a.id === row.id ? row : a))
         if (eventType === 'DELETE') setAccounts(prev => prev.filter(a => a.id !== old.id))
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, ({ eventType, new: row, old }) => {
-        if (eventType === 'INSERT') setNotifications(prev => [row, ...prev])
-        if (eventType === 'UPDATE') setNotifications(prev => prev.map(n => n.id === row.id ? row : n))
-        if (eventType === 'DELETE') setNotifications(prev => prev.filter(n => n.id !== old.id))
-      })
       .subscribe()
 
     channelRef.current = channel
@@ -138,17 +137,33 @@ export function AppProvider({ children }) {
 
   // ── Auth ───────────────────────────────────────────────────────────────────
   const doLogin = useCallback(async (username, password) => {
-    const { data, error } = await supabase
+    const SEED_ACCOUNTS = [
+      { id: 1, username: 'superadmin', password: 'super123', name: 'Super Admin', role: 'superadmin' },
+      { id: 2, username: 'admin',      password: 'admin123', name: 'Admin Utama', role: 'admin' },
+      { id: 3, username: 'staff',      password: 'staff123', name: 'Staff Operasional', role: 'staff' },
+    ]
+
+    let { data, error } = await supabase
       .from('accounts')
       .select('*')
       .eq('username', username)
       .eq('password', password)
       .maybeSingle()
-    if (data && !error) {
+
+    // Fallback: jika DB kosong/belum di-seed, pakai akun default
+    if (!data && !error) {
+      data = SEED_ACCOUNTS.find(a => a.username === username && a.password === password) || null
+      // Coba seed tabel accounts jika masih kosong
+      if (data) {
+        await supabase.from('accounts').upsert(SEED_ACCOUNTS, { onConflict: 'username' })
+      }
+    }
+
+    if (data) {
       localStorage.setItem(SESSION_KEY, JSON.stringify({ user: data, loginAt: Date.now() }))
       setCurrentUser(data)
-      setLoading(true) // Show loading while initial data loads
-      setLoggedIn(true) // Triggers useEffect → loadAll()
+      setLoading(true)
+      setLoggedIn(true)
       showToast(`Selamat datang, ${data.name}!`, 'success')
       return true
     }
@@ -163,36 +178,32 @@ export function AppProvider({ children }) {
 
   // ── Stock helper ───────────────────────────────────────────────────────────
   const getAvailableStock = useCallback((item) => {
-    let rented = 0
-    transactions.forEach(t => {
-      if (t.status === 'Sedang Disewa' || t.status === 'Booked' || t.status === 'Terlambat') {
-        t.itemIds.forEach((iid, idx) => {
-          if (iid === item.id) rented += (t.itemQtys[idx] || 1)
-        })
-      }
-    })
-    return Math.max(0, item.total_stock - rented)
-  }, [transactions])
+    return item.total_stock || 0
+  }, [])
 
   // ── Items CRUD ─────────────────────────────────────────────────────────────
   const addItem = useCallback(async (form) => {
-    const { error } = await supabase.from('items').insert([{
+    const { data, error } = await supabase.from('items').insert([{
       sku: form.sku, name: form.name, category: form.category,
-      variation: form.variation, rental_price: form.rental_price,
-      purchase_price: form.purchase_price, total_stock: form.total_stock, notes: form.notes,
-    }])
+      variation: form.variation, size: form.size || '',
+      rental_price: form.rental_price, purchase_price: form.purchase_price,
+      total_stock: form.total_stock, notes: form.notes,
+    }]).select().single()
     if (error) { showToast('Gagal menambah item: ' + error.message, 'error'); return false }
+    if (data) setItems(prev => [...prev, data])
     showToast('Item baru ditambahkan!', 'success')
     return true
   }, [showToast])
 
   const updateItem = useCallback(async (id, form) => {
-    const { error } = await supabase.from('items').update({
+    const { data, error } = await supabase.from('items').update({
       sku: form.sku, name: form.name, category: form.category,
-      variation: form.variation, rental_price: form.rental_price,
-      purchase_price: form.purchase_price, total_stock: form.total_stock, notes: form.notes,
-    }).eq('id', id)
+      variation: form.variation, size: form.size || '',
+      rental_price: form.rental_price, purchase_price: form.purchase_price,
+      total_stock: form.total_stock, notes: form.notes,
+    }).eq('id', id).select().single()
     if (error) { showToast('Gagal update item: ' + error.message, 'error'); return false }
+    if (data) setItems(prev => prev.map(i => i.id === id ? data : i))
     showToast('Item diperbarui!', 'success')
     return true
   }, [showToast])
@@ -201,13 +212,26 @@ export function AppProvider({ children }) {
     const item = items.find(i => i.id === id)
     const { error } = await supabase.from('items').delete().eq('id', id)
     if (error) { showToast('Gagal hapus item: ' + error.message, 'error'); return false }
+    setItems(prev => prev.filter(i => i.id !== id))
     showToast(`${item?.name} dihapus`, 'success')
     return true
   }, [items, showToast])
 
+  const bulkImportItems = useCallback(async (rows) => {
+    let success = 0
+    const errors = []
+    for (const row of rows) {
+      const { data, error } = await supabase.from('items').insert([{ ...row, size: row.size || '' }]).select().single()
+      if (error) errors.push(`${row.name}: ${error.message}`)
+      else { success++; if (data) setItems(prev => [...prev, data]) }
+    }
+    if (success > 0) showToast(`${success} item berhasil diimport!`, 'success')
+    return { success, failed: errors.length, errors }
+  }, [showToast])
+
   // ── Transactions CRUD ──────────────────────────────────────────────────────
   const addTransaction = useCallback(async (tx) => {
-    const { error } = await supabase.from('rentals').insert([txToDb(tx)])
+    const { error } = await supabase.from('transactions').insert([txToDb(tx)])
     if (error) { showToast('Gagal simpan transaksi: ' + error.message, 'error'); return false }
     // Also upsert customer record
     const existing = customers.find(c => c.phone.replace(/\D/g,'') === tx.phone.replace(/\D/g,''))
@@ -232,13 +256,13 @@ export function AppProvider({ children }) {
     const current = transactions.find(t => t.id === id)
     if (!current) return false
     const merged = { ...current, ...updates }
-    const { error } = await supabase.from('rentals').update(txToDb(merged)).eq('id', id)
+    const { error } = await supabase.from('transactions').update(txToDb(merged)).eq('id', id)
     if (error) { showToast('Gagal update transaksi: ' + error.message, 'error'); return false }
     return true
   }, [transactions, showToast])
 
   const deleteTransaction = useCallback(async (id) => {
-    const { error } = await supabase.from('rentals').delete().eq('id', id)
+    const { error } = await supabase.from('transactions').delete().eq('id', id)
     if (error) { showToast('Gagal hapus transaksi: ' + error.message, 'error'); return false }
     showToast(`Transaksi ${id} dihapus`, 'success')
     return true
@@ -261,12 +285,7 @@ export function AppProvider({ children }) {
     return true
   }, [showToast])
 
-  // ── Notifications ──────────────────────────────────────────────────────────
-  const markAllRead = useCallback(async () => {
-    const unread = notifications.filter(n => !n.read).map(n => n.id)
-    if (unread.length === 0) return
-    await supabase.from('notifications').update({ read: true }).in('id', unread)
-  }, [notifications])
+  const markAllRead = useCallback(() => {}, [])
 
   // ── Computed ───────────────────────────────────────────────────────────────
   const unreadCount = notifications.filter(n => !n.read).length
@@ -280,7 +299,7 @@ export function AppProvider({ children }) {
     <AppContext.Provider value={{
       loading, loggedIn, currentUser, accounts, items, transactions, customers, notifications, toasts,
       doLogin, doLogout, showToast, getAvailableStock,
-      addItem, updateItem, deleteItem,
+      addItem, updateItem, deleteItem, bulkImportItems,
       addTransaction, updateTransaction, deleteTransaction,
       addAccount, removeAccount, markAllRead,
       unreadCount, lowStockItems, dueTodayTx, todayRevenue,

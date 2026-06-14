@@ -7,7 +7,7 @@ const NAV_ITEMS = [
   { id: 'customers', label: 'Customer', icon: 'fas fa-users' },
 ]
 
-export default function Sidebar({ activeTab, setActiveTab, sidebarOpen, setSidebarOpen, onManageAccounts }) {
+export default function Sidebar({ activeTab, setActiveTab, sidebarOpen, setSidebarOpen, desktopSidebarOpen, onManageAccounts }) {
   const { currentUser, doLogout, items, transactions, customers } = useApp()
 
   function getBadge(id) {
@@ -18,7 +18,15 @@ export default function Sidebar({ activeTab, setActiveTab, sidebarOpen, setSideb
   }
 
   return (
-    <aside className={`fixed lg:static lg:translate-x-0 z-40 w-64 h-full gradient-bg text-white flex flex-col transition-transform duration-300 no-print flex-shrink-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+    <aside className={`
+      fixed lg:static z-40 h-full gradient-bg text-white flex flex-col no-print flex-shrink-0
+      transition-all duration-300 ease-in-out overflow-hidden
+      w-64
+      ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+      lg:translate-x-0
+      ${desktopSidebarOpen ? 'lg:max-w-[16rem] lg:opacity-100' : 'lg:max-w-0 lg:opacity-0'}
+    `}>
+      <div className="w-64 flex flex-col h-full">
       <div className="p-4 border-b border-white/10">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
@@ -74,6 +82,7 @@ export default function Sidebar({ activeTab, setActiveTab, sidebarOpen, setSideb
             <i className="fas fa-sign-out-alt"></i> Keluar
           </button>
         </div>
+      </div>
       </div>
     </aside>
   )

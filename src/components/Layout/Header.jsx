@@ -8,7 +8,7 @@ const TAB_META = {
   customers: { title: 'Database Customer', subtitle: 'Data penyewa & loyalty program' },
 }
 
-export default function Header({ activeTab, setSidebarOpen }) {
+export default function Header({ activeTab, setSidebarOpen, desktopSidebarOpen, setDesktopSidebarOpen }) {
   const { notifications, unreadCount, markAllRead } = useApp()
   const [showNotif, setShowNotif] = useState(false)
   const { title, subtitle } = TAB_META[activeTab] || {}
@@ -18,6 +18,13 @@ export default function Header({ activeTab, setSidebarOpen }) {
       <div className="flex items-center gap-3 min-w-0">
         <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-xl flex-shrink-0">
           <i className="fas fa-bars"></i>
+        </button>
+        <button
+          onClick={() => setDesktopSidebarOpen(v => !v)}
+          className="hidden lg:flex p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition flex-shrink-0"
+          title={desktopSidebarOpen ? 'Sembunyikan sidebar' : 'Tampilkan sidebar'}
+        >
+          <i className={`fas fa-${desktopSidebarOpen ? 'indent' : 'outdent'} text-base`}></i>
         </button>
         <div className="min-w-0">
           <h2 className="text-base sm:text-lg font-extrabold text-slate-800 truncate">{title}</h2>

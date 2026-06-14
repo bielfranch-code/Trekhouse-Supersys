@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useApp, CATEGORIES } from '../../context/AppContext'
 import ItemModal from './ItemModal'
+import ExcelUploadModal from './ExcelUploadModal'
 
 function getCatIcon(cat) {
   const m = { Tenda:'fas fa-campground', Carrier:'fas fa-shopping-bag', 'Sleeping Bag':'fas fa-bed', Sepatu:'fas fa-shoe-prints', Kompor:'fas fa-fire', Matras:'fas fa-layer-group', Aksesoris:'fas fa-tools' }
@@ -8,12 +9,13 @@ function getCatIcon(cat) {
 }
 
 export default function MasterData() {
-  const { items, getAvailableStock, addItem, updateItem, deleteItem } = useApp()
+  const { items, getAvailableStock, addItem, updateItem, deleteItem, bulkImportItems } = useApp()
   const [search, setSearch] = useState('')
   const [catFilter, setCatFilter] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [editingItem, setEditingItem] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [excelOpen, setExcelOpen] = useState(false)
 
   const filtered = items.filter(i => {
     const q = search.toLowerCase()
@@ -47,9 +49,14 @@ export default function MasterData() {
               {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
             </select>
           </div>
-          <button onClick={openAdd} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition whitespace-nowrap">
-            <i className="fas fa-plus"></i> Tambah Item
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => setExcelOpen(true)} className="bg-green-700 hover:bg-green-800 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition whitespace-nowrap">
+              <i className="fas fa-file-excel"></i> Import Excel
+            </button>
+            <button onClick={openAdd} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition whitespace-nowrap">
+              <i className="fas fa-plus"></i> Tambah Item
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -59,14 +66,16 @@ export default function MasterData() {
                 <th className="text-left px-4 py-3 text-xs font-extrabold text-slate-500 uppercase tracking-wider">Item</th>
                 <th className="text-left px-3 py-3 text-xs font-extrabold text-slate-500 uppercase tracking-wider">SKU</th>
                 <th className="text-left px-3 py-3 text-xs font-extrabold text-slate-500 uppercase tracking-wider">Kategori</th>
-                <th className="text-left px-3 py-3 text-xs font-extrabold text-slate-500 uppercase tracking-wider">Harga/Hari</th>
-                <th className="text-left px-3 py-3 text-xs font-extrabold text-slate-500 uppercase tracking-wider">Stok Tersedia</th>
+                <th className="text-left px-3 py-3 text-xs font-extrabold text-slate-500 uppercase tracking-wider">Varian</th>
+                <th className="text-left px-3 py-3 text-xs font-extrabold text-slate-500 uppercase tracking-wider">Ukuran</th>
+                <th className="text-left px-3 py-3 text-xs font-extrabold text-slate-500 uppercase tracking-wider">Harga/4 Hari</th>
+                <th className="text-left px-3 py-3 text-xs font-extrabold text-slate-500 uppercase tracking-wider">Stok</th>
                 <th className="text-left px-3 py-3 text-xs font-extrabold text-slate-500 uppercase tracking-wider">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.length === 0 && (
-                <tr><td colSpan={6} className="text-center py-12 text-slate-400"><i className="fas fa-box-open text-3xl mb-3 block"></i>Tidak ada item</td></tr>
+                <tr><td colSpan={8} className="text-center py-12 text-slate-400"><i className="fas fa-box-open text-3xl mb-3 block"></i>Tidak ada item</td></tr>
               )}
               {filtered.map(item => {
                 const avail = getAvailableStock(item)
@@ -87,8 +96,10 @@ export default function MasterData() {
                     <td className="px-3 py-3" data-label="Kategori">
                       <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold">{item.category}</span>
                     </td>
-                    <td className="px-3 py-3 font-bold text-slate-800" data-label="Harga/Hari">Rp {item.rental_price.toLocaleString()}</td>
-                    <td className="px-3 py-3" data-label="Stok Tersedia">
+                    <td className="px-3 py-3 text-sm text-slate-600" data-label="Varian">{item.variation || <span className="text-slate-300">-</span>}</td>
+                    <td className="px-3 py-3 text-sm text-slate-600" data-label="Ukuran">{item.size || <span className="text-slate-300">-</span>}</td>
+                    <td className="px-3 py-3 font-bold text-slate-800" data-label="Harga/4 Hari">Rp {item.rental_price.toLocaleString()}</td>
+                    <td className="px-3 py-3" data-label="Stok">
                       <div className="flex items-center gap-1.5">
                         <div className={`w-2 h-2 rounded-full flex-shrink-0 ${avail === 0 ? 'bg-rose-500' : avail <= 2 ? 'bg-amber-500' : 'bg-emerald-500'}`}></div>
                         <span className={`font-extrabold ${avail === 0 ? 'text-rose-600' : 'text-slate-800'}`}>{avail}</span>
@@ -116,6 +127,7 @@ export default function MasterData() {
       </div>
 
       <ItemModal open={modalOpen} editingItem={editingItem} onClose={() => setModalOpen(false)} onSave={handleSave} />
+      <ExcelUploadModal open={excelOpen} onClose={() => setExcelOpen(false)} onImport={bulkImportItems} />
 
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay" style={{ background: 'rgba(0,0,0,.6)' }}>

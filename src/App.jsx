@@ -9,6 +9,7 @@ import Transactions from './components/Transactions/Transactions'
 import Customers from './components/Customers/Customers'
 import AccountsModal from './components/Accounts/AccountsModal'
 import Toast from './components/ui/Toast'
+import InstallPrompt from './components/ui/InstallPrompt'
 
 function LoadingScreen() {
   return (
@@ -31,6 +32,7 @@ export default function App() {
   const { loggedIn, loading } = useApp()
   const [activeTab, setActiveTab] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true)
   const [accountsOpen, setAccountsOpen] = useState(false)
 
   if (loading) return (
@@ -55,6 +57,7 @@ export default function App() {
         setActiveTab={setActiveTab}
         sidebarOpen={sidebarOpen}
         setSidebarOpen={setSidebarOpen}
+        desktopSidebarOpen={desktopSidebarOpen}
         onManageAccounts={() => setAccountsOpen(true)}
       />
 
@@ -63,7 +66,12 @@ export default function App() {
       )}
 
       <main className="flex-1 overflow-y-auto min-w-0">
-        <Header activeTab={activeTab} setSidebarOpen={setSidebarOpen} />
+        <Header
+          activeTab={activeTab}
+          setSidebarOpen={setSidebarOpen}
+          desktopSidebarOpen={desktopSidebarOpen}
+          setDesktopSidebarOpen={setDesktopSidebarOpen}
+        />
         <div className="p-4 sm:p-5 max-w-[1400px] mx-auto">
           {activeTab === 'dashboard' && <Dashboard setActiveTab={setActiveTab} />}
           {activeTab === 'master' && <MasterData />}
@@ -73,6 +81,7 @@ export default function App() {
       </main>
 
       <AccountsModal open={accountsOpen} onClose={() => setAccountsOpen(false)} />
+      <InstallPrompt />
     </div>
   )
 }

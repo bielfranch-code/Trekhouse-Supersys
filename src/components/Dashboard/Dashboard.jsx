@@ -21,12 +21,7 @@ const CHART_PERIODS = [
   { key:'1y', label:'1 Tahun' },
 ]
 
-const CATEGORY_STATS = [
-  { name:'Tenda', pct:42, color:'#10b981' },
-  { name:'Carrier', pct:28, color:'#3b82f6' },
-  { name:'Sleeping Bag', pct:18, color:'#f59e0b' },
-  { name:'Lainnya', pct:12, color:'#94a3b8' },
-]
+const CAT_COLORS = ['#10b981','#3b82f6','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#ec4899','#94a3b8']
 
 const DAY_LBL = ['Min','Sen','Sel','Rab','Kam','Jum','Sab']
 const MONTH_LBL = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agt','Sep','Okt','Nov','Des']
@@ -89,10 +84,36 @@ function getRevenueData(transactions, period) {
   return buckets.map(({ label, val }) => ({ label, val }))
 }
 
+function getCategoryStats(transactions, items) {
+  const countMap = {}
+  for (const t of transactions) {
+    if (!t.items) continue
+    // Try to match items_summary text to item categories
+    const names = t.items.split(',').map(s => s.trim())
+    for (const name of names) {
+      const found = items.find(i => i.name && name.toLowerCase().includes(i.name.toLowerCase()))
+      const cat = found?.category || 'Lainnya'
+      countMap[cat] = (countMap[cat] || 0) + 1
+    }
+  }
+  const total = Object.values(countMap).reduce((s, v) => s + v, 0)
+  if (total === 0) return []
+  return Object.entries(countMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([name, count], i) => ({
+      name,
+      count,
+      pct: Math.round((count / total) * 100),
+      color: CAT_COLORS[i] || '#94a3b8',
+    }))
+}
+
 export default function Dashboard({ setActiveTab }) {
   const { items, transactions, customers, todayRevenue, lowStockItems, dueTodayTx, getAvailableStock, showToast } = useApp()
   const [chartPeriod, setChartPeriod] = useState('7d')
 
+  const categoryStats = useMemo(() => getCategoryStats(transactions, items), [transactions, items])
   const chartData = useMemo(() => getRevenueData(transactions, chartPeriod), [transactions, chartPeriod])
   const chartTotal = useMemo(() => chartData.reduce((s, v) => s + v.val, 0), [chartData])
   const chartAvg = chartData.length ? chartTotal / chartData.length : 0
@@ -195,11 +216,19 @@ export default function Dashboard({ setActiveTab }) {
         <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm">
           <h3 className="font-extrabold text-slate-800 mb-4">Kategori Terlaris</h3>
           <div className="space-y-3">
-            {CATEGORY_STATS.map(cat => (
+            {categoryStats.length === 0 ? (
+              <div className="text-center py-6 text-slate-400">
+                <i className="fas fa-chart-bar text-2xl mb-2 block text-slate-200"></i>
+                <p className="text-xs">Data akan muncul setelah ada transaksi</p>
+              </div>
+            ) : categoryStats.map(cat => (
               <div key={cat.name}>
                 <div className="flex justify-between text-xs mb-1">
-                  <span className="font-bold text-slate-700">{cat.name}</span>
-                  <span className="text-slate-400">{cat.pct}%</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-slate-700">{cat.name}</span>
+                    <span className="text-[10px] text-slate-400">{cat.count}x</span>
+                  </div>
+                  <span className="text-slate-400 font-semibold">{cat.pct}%</span>
                 </div>
                 <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                   <div className="h-2 rounded-full transition-all duration-700" style={{ width: `${cat.pct}%`, background: cat.color }}></div>

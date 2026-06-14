@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { CATEGORIES } from '../../context/AppContext'
 
-const EMPTY_FORM = { name:'', sku:'', category:'', rental_price:0, purchase_price:0, total_stock:1, variation:'', notes:'' }
+const EMPTY_FORM = { name:'', sku:'', category:'', rental_price:0, purchase_price:0, total_stock:1, variation:'', size:'', notes:'' }
 
 export default function ItemModal({ open, editingItem, onClose, onSave }) {
   const [form, setForm] = useState(EMPTY_FORM)
@@ -46,7 +46,7 @@ export default function ItemModal({ open, editingItem, onClose, onSave }) {
             </select>
           </div>
           <div>
-            <label className="text-xs font-bold text-slate-600 block mb-1">Harga Sewa/Hari (Rp)</label>
+            <label className="text-xs font-bold text-slate-600 block mb-1">Harga Sewa/4 Hari (Rp)</label>
             <input value={form.rental_price} onChange={e => set('rental_price', +e.target.value)} type="number" min="0" placeholder="50000" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm transition" />
           </div>
           <div>
@@ -58,8 +58,12 @@ export default function ItemModal({ open, editingItem, onClose, onSave }) {
             <input value={form.total_stock} onChange={e => set('total_stock', +e.target.value)} type="number" min="1" placeholder="5" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm transition" />
           </div>
           <div>
-            <label className="text-xs font-bold text-slate-600 block mb-1">Variasi / Ukuran</label>
-            <input value={form.variation} onChange={e => set('variation', e.target.value)} type="text" placeholder="Size 42, Merah, dll" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm transition" />
+            <label className="text-xs font-bold text-slate-600 block mb-1">Varian</label>
+            <input value={form.variation} onChange={e => set('variation', e.target.value)} type="text" placeholder="Merah, Biru, dll" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm transition" />
+          </div>
+          <div>
+            <label className="text-xs font-bold text-slate-600 block mb-1">Ukuran</label>
+            <input value={form.size} onChange={e => set('size', e.target.value)} type="text" placeholder="S, M, L, 42, dll" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm transition" />
           </div>
           <div className="sm:col-span-2">
             <label className="text-xs font-bold text-slate-600 block mb-1">Catatan</label>
