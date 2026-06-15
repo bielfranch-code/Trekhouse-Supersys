@@ -290,7 +290,24 @@ export function AppProvider({ children }) {
   // ── Computed ───────────────────────────────────────────────────────────────
   const unreadCount = notifications.filter(n => !n.read).length
   const lowStockItems = items.filter(i => getAvailableStock(i) <= 2)
-  const dueTodayTx = transactions.filter(t => t.status === 'Sedang Disewa' || t.status === 'Terlambat')
+
+  // Jatuh tempo: transaksi aktif yang tanggal kembalinya hari ini atau besok (H-1)
+  const dueTodayTx = (() => {
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const tomorrow = new Date(today.getTime() + 86400000)
+    const dayAfter = new Date(today.getTime() + 2 * 86400000)
+    return transactions.filter(t => {
+      if (t.status !== 'Sedang Disewa') return false
+      const ret = new Date(t.return)
+      const retDay = new Date(ret.getFullYear(), ret.getMonth(), ret.getDate())
+      // tampilkan jika jatuh tempo hari ini atau besok (H-1)
+      return retDay >= today && retDay < dayAfter
+    })
+  })()
+
+  const activeTx = transactions.filter(t => t.status === 'Sedang Disewa')
+
   const todayRevenue = transactions
     .filter(t => t.status !== 'Booked')
     .reduce((s, t) => s + t.subtotal + (t.penalty || 0), 0)
@@ -302,7 +319,7 @@ export function AppProvider({ children }) {
       addItem, updateItem, deleteItem, bulkImportItems,
       addTransaction, updateTransaction, deleteTransaction,
       addAccount, removeAccount, markAllRead,
-      unreadCount, lowStockItems, dueTodayTx, todayRevenue,
+      unreadCount, lowStockItems, dueTodayTx, activeTx, todayRevenue,
     }}>
       {children}
     </AppContext.Provider>

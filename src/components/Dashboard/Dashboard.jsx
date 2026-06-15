@@ -110,7 +110,7 @@ function getCategoryStats(transactions, items) {
 }
 
 export default function Dashboard({ setActiveTab }) {
-  const { items, transactions, customers, todayRevenue, lowStockItems, dueTodayTx, getAvailableStock, showToast } = useApp()
+  const { items, transactions, customers, todayRevenue, lowStockItems, dueTodayTx, activeTx, getAvailableStock, showToast } = useApp()
   const [chartPeriod, setChartPeriod] = useState('7d')
 
   const categoryStats = useMemo(() => getCategoryStats(transactions, items), [transactions, items])
@@ -152,7 +152,7 @@ export default function Dashboard({ setActiveTab }) {
             <span className="text-[10px] font-extrabold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-lg">Aktif</span>
           </div>
           <p className="text-[11px] text-slate-500 font-semibold leading-tight">Sedang Disewa</p>
-          <p className="text-lg sm:text-xl font-extrabold text-slate-800 mt-1">{transactions.filter(t => t.status === 'Sedang Disewa').length} Aktif</p>
+          <p className="text-lg sm:text-xl font-extrabold text-slate-800 mt-1">{activeTx.length} Aktif</p>
         </div>
         <div className="stat-card bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
           <div className="flex items-start justify-between mb-2">
@@ -239,7 +239,7 @@ export default function Dashboard({ setActiveTab }) {
           <div className="mt-4 pt-3 border-t border-slate-100 space-y-1">
             <div className="flex justify-between text-xs"><span className="text-slate-500">Total Inventaris</span><span className="font-bold">{items.length} item</span></div>
             <div className="flex justify-between text-xs"><span className="text-slate-500">Total Customer</span><span className="font-bold">{customers.length} orang</span></div>
-            <div className="flex justify-between text-xs"><span className="text-slate-500">Transaksi Aktif</span><span className="font-bold text-blue-600">{transactions.filter(t => t.status === 'Sedang Disewa').length}x</span></div>
+            <div className="flex justify-between text-xs"><span className="text-slate-500">Transaksi Aktif</span><span className="font-bold text-blue-600">{activeTx.length}x</span></div>
           </div>
         </div>
       </div>
