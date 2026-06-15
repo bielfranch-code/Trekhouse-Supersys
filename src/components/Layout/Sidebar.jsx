@@ -29,9 +29,7 @@ export default function Sidebar({ activeTab, setActiveTab, sidebarOpen, setSideb
       <div className="w-64 flex flex-col h-full">
       <div className="p-4 border-b border-white/10">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
-            <i className="fas fa-mountain text-lg"></i>
-          </div>
+          <img src="/logo.png" alt="TrekHouse Logo" className="w-10 h-10 object-contain flex-shrink-0" />
           <div className="min-w-0">
             <h1 className="font-extrabold text-base leading-tight truncate">TrekingHouse</h1>
             <p className="text-[10px] text-slate-400">SuperSys v4.0</p>

@@ -34,9 +34,7 @@ export default function Login() {
           <div className="absolute -left-8 bottom-10 w-40 h-40 rounded-full bg-teal-400/10 blur-2xl" />
           <div className="relative">
             <div className="flex items-center gap-2.5">
-              <div className="w-11 h-11 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg">
-                <i className="fas fa-mountain text-white text-xl"></i>
-              </div>
+              <img src="/logo.png" alt="TrekHouse Logo" className="w-11 h-11 object-contain" />
               <div>
                 <p className="font-extrabold text-lg leading-tight">TrekingHouse</p>
                 <p className="text-emerald-300/80 text-xs font-semibold tracking-wide">SUPERSYS v4.0</p>
@@ -69,9 +67,7 @@ export default function Login() {
         <div className="p-8 sm:p-10 flex flex-col justify-center">
           {/* mobile logo */}
           <div className="md:hidden flex items-center gap-2.5 mb-6">
-            <div className="w-11 h-11 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg">
-              <i className="fas fa-mountain text-white text-xl"></i>
-            </div>
+            <img src="/logo.png" alt="TrekHouse Logo" className="w-11 h-11 object-contain" />
             <div>
               <p className="font-extrabold text-lg text-slate-800 leading-tight">TrekingHouse</p>
               <p className="text-emerald-600 text-xs font-semibold tracking-wide">SUPERSYS v4.0</p>
