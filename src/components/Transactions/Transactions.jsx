@@ -2,6 +2,25 @@ import { useState } from 'react'
 import { useApp } from '../../context/AppContext'
 import NewTxModal from './NewTxModal'
 
+const ID_MONTHS = ['jan','feb','mar','apr','mei','jun','jul','agt','sep','okt','nov','des']
+function parseDate(str) {
+  if (!str) return null
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) return new Date(str)
+  const parts = str.trim().split(/\s+/)
+  if (parts.length === 3) {
+    const day = parseInt(parts[0], 10)
+    const mon = ID_MONTHS.indexOf(parts[1].toLowerCase())
+    const year = parseInt(parts[2], 10)
+    if (mon !== -1 && !isNaN(day) && !isNaN(year)) return new Date(year, mon, day)
+  }
+  return new Date(str)
+}
+function fmtDate(str) {
+  const d = parseDate(str)
+  if (!d || isNaN(d)) return str || '-'
+  return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
 const STATUS_COLORS = {
   'Sedang Disewa': 'bg-blue-100 text-blue-700',
   'Booked': 'bg-amber-100 text-amber-700',
@@ -43,7 +62,7 @@ export default function Transactions() {
 
   function sendWhatsApp(t) {
     const penalty = t.penalty > 0 ? `\n⚠️ Denda: Rp ${t.penalty.toLocaleString()}` : ''
-    const msg = `Halo *${t.name}* 👋\n\nPengingat dari *TrekingHouse SuperSys*:\n\n📦 Item: ${t.items}\n📅 Jatuh Tempo: ${t.return}\n💰 Total: Rp ${t.subtotal.toLocaleString()}${penalty}\n\nMohon kembalikan barang tepat waktu ya 🙏\n\n_TrekingHouse — Alat Hiking Terpercaya_`
+    const msg = `Halo *${t.name}* 👋\n\nPengingat dari *TrekingHouse SuperSys*:\n\n📦 Item: ${t.items}\n📅 Jatuh Tempo: ${fmtDate(t.return)}\n💰 Total: Rp ${t.subtotal.toLocaleString()}${penalty}\n\nMohon kembalikan barang tepat waktu ya 🙏\n\n_TrekingHouse — Alat Hiking Terpercaya_`
     setWaPreview({ t, msg })
   }
 
@@ -60,8 +79,8 @@ export default function Transactions() {
     <h2>⛰️ TrekingHouse SuperSys</h2><p>Sistem Rental Alat Hiking Terpercaya</p>
     <hr><div class="row"><span>ID</span><span class="bold">${t.id}</span></div>
     <div class="row"><span>Customer</span><span>${t.name}</span></div>
-    <div class="row"><span>Ambil</span><span>${t.pickup}</span></div>
-    <div class="row"><span>Kembali</span><span>${t.return}</span></div>
+    <div class="row"><span>Ambil</span><span>${fmtDate(t.pickup)}</span></div>
+    <div class="row"><span>Kembali</span><span>${fmtDate(t.return)}</span></div>
     <hr><div style="margin:6px 0;">${t.items}</div>
     <hr><div class="row"><span>Subtotal</span><span>Rp ${t.subtotal.toLocaleString()}</span></div>
     <div class="row"><span>Deposit (30%)</span><span>Rp ${Math.round(t.subtotal*.3).toLocaleString()}</span></div>
@@ -129,8 +148,8 @@ export default function Transactions() {
                     </div>
                   </td>
                   <td className="px-3 py-3" data-label="Periode">
-                    <p className="text-xs font-semibold text-slate-700">{t.pickup}</p>
-                    <p className="text-xs text-slate-400">→ {t.return}</p>
+                    <p className="text-xs font-semibold text-slate-700">{fmtDate(t.pickup)}</p>
+                    <p className="text-xs text-slate-400">→ {fmtDate(t.return)}</p>
                   </td>
                   <td className="px-3 py-3 text-xs text-slate-600 max-w-[140px]" data-label="Item">
                     <span className="truncate block">{t.items}</span>
@@ -201,11 +220,11 @@ export default function Transactions() {
                 </div>
                 <div className="bg-slate-50 rounded-xl p-3">
                   <p className="text-xs text-slate-400 mb-1">Tanggal Ambil</p>
-                  <p className="font-semibold text-sm">{selectedTx.pickup}</p>
+                  <p className="font-semibold text-sm">{fmtDate(selectedTx.pickup)}</p>
                 </div>
                 <div className="bg-slate-50 rounded-xl p-3">
                   <p className="text-xs text-slate-400 mb-1">Jatuh Tempo</p>
-                  <p className={`font-semibold text-sm ${selectedTx.status === 'Terlambat' ? 'text-rose-600' : ''}`}>{selectedTx.return}</p>
+                  <p className={`font-semibold text-sm ${selectedTx.status === 'Terlambat' ? 'text-rose-600' : ''}`}>{fmtDate(selectedTx.return)}</p>
                 </div>
               </div>
               <div className="bg-slate-50 rounded-xl p-3">

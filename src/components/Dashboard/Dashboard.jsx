@@ -2,6 +2,25 @@ import { useState, useMemo } from 'react'
 import { useApp } from '../../context/AppContext'
 import RevenueChart from './RevenueChart'
 
+const ID_MONTHS = ['jan','feb','mar','apr','mei','jun','jul','agt','sep','okt','nov','des']
+function parseDate(str) {
+  if (!str) return null
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) return new Date(str)
+  const parts = str.trim().split(/\s+/)
+  if (parts.length === 3) {
+    const day = parseInt(parts[0], 10)
+    const mon = ID_MONTHS.indexOf(parts[1].toLowerCase())
+    const year = parseInt(parts[2], 10)
+    if (mon !== -1 && !isNaN(day) && !isNaN(year)) return new Date(year, mon, day)
+  }
+  return new Date(str)
+}
+function fmtDate(str) {
+  const d = parseDate(str)
+  if (!d || isNaN(d)) return str || '-'
+  return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
 function getCatIcon(cat) {
   const m = { Tenda:'fas fa-campground', Carrier:'fas fa-shopping-bag', 'Sleeping Bag':'fas fa-bed', Sepatu:'fas fa-shoe-prints', Kompor:'fas fa-fire', Matras:'fas fa-layer-group', Aksesoris:'fas fa-tools' }
   return m[cat] || 'fas fa-box'
@@ -128,7 +147,7 @@ export default function Dashboard({ setActiveTab }) {
   }, [chartData])
 
   function sendWhatsApp(t) {
-    const msg = `Halo *${t.name}* 👋\n\nPengingat dari *TrekingHouse SuperSys*:\n\n📦 Item: ${t.items}\n📅 Jatuh Tempo: ${t.return}\n💰 Total: Rp ${t.subtotal.toLocaleString()}\n\nMohon kembalikan barang tepat waktu ya 🙏`
+    const msg = `Halo *${t.name}* 👋\n\nPengingat dari *TrekingHouse SuperSys*:\n\n📦 Item: ${t.items}\n📅 Jatuh Tempo: ${fmtDate(t.return)}\n💰 Total: Rp ${t.subtotal.toLocaleString()}\n\nMohon kembalikan barang tepat waktu ya 🙏`
     const url = `https://wa.me/${t.phone?.replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`
     window.open(url, '_blank')
     showToast('Membuka WhatsApp...', 'info')
@@ -267,7 +286,7 @@ export default function Dashboard({ setActiveTab }) {
                   </div>
                 </div>
                 <div className="text-right flex-shrink-0 ml-2">
-                  <p className="text-sm font-extrabold text-rose-600">{t.return}</p>
+                  <p className="text-sm font-extrabold text-rose-600">{fmtDate(t.return)}</p>
                   <button onClick={() => sendWhatsApp(t)} className="text-xs text-emerald-600 hover:text-emerald-700 font-semibold">
                     <i className="fab fa-whatsapp"></i> Ingatkan
                   </button>

@@ -140,8 +140,8 @@ export default function NewTxModal({ open, onClose, onSave }) {
     const tx = {
       id, name: form.customerName, phone: form.phone.replace(/\D/g,''),
       idType: form.idType, idNumber: form.idNumber,
-      pickup: new Date(form.pickupDate).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}),
-      return: new Date(form.returnDate).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}),
+      pickup: form.pickupDate,
+      return: form.returnDate,
       items: itemNames, itemIds: validItems.map(i => +i.itemId), itemQtys: validItems.map(i => i.qty),
       subtotal: txSubtotal, penalty: 0, status: 'Booked', returnNote: ''
     }
@@ -168,9 +168,6 @@ export default function NewTxModal({ open, onClose, onSave }) {
               <select value={form.idType} onChange={e => set('idType', e.target.value)} className="border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white transition">
                 <option value="KTP">KTP</option><option value="SIM">SIM</option><option value="KTM">KTM</option>
               </select>
-              <div className="col-span-2">
-                <input value={form.idNumber} onChange={e => set('idNumber', e.target.value)} type="text" placeholder="Nomor ID (opsional)" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm transition font-mono" />
-              </div>
             </div>
           </div>
 

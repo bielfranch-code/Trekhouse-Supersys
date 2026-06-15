@@ -5,6 +5,33 @@ const AppContext = createContext(null)
 
 export const CATEGORIES = ['Tenda','Carrier','Sleeping Bag','Sepatu','Kompor','Matras','Aksesoris']
 
+// ── Date helpers ─────────────────────────────────────────────────────────────
+const ID_MONTHS = ['jan','feb','mar','apr','mei','jun','jul','agt','sep','okt','nov','des']
+
+// Parse both ISO "2026-05-03" and Indonesian "3 Mei 2026" into a Date object
+function parseDate(str) {
+  if (!str) return null
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) return new Date(str)
+  // Indonesian format: "3 Mei 2026"
+  const parts = str.trim().split(/\s+/)
+  if (parts.length === 3) {
+    const day = parseInt(parts[0], 10)
+    const mon = ID_MONTHS.indexOf(parts[1].toLowerCase())
+    const year = parseInt(parts[2], 10)
+    if (mon !== -1 && !isNaN(day) && !isNaN(year)) {
+      return new Date(year, mon, day)
+    }
+  }
+  return new Date(str)
+}
+
+// Format a date string for display: always show as Indonesian "3 Mei 2026"
+function formatDateDisplay(str) {
+  const d = parseDate(str)
+  if (!d || isNaN(d)) return str
+  return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
 // ── DB row ↔ app shape mappers ──────────────────────────────────────────────
 function dbToTx(row) {
   return {
@@ -295,18 +322,17 @@ export function AppProvider({ children }) {
   const dueTodayTx = (() => {
     const now = new Date()
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const tomorrow = new Date(today.getTime() + 86400000)
     const dayAfter = new Date(today.getTime() + 2 * 86400000)
     return transactions.filter(t => {
-      if (t.status !== 'Sedang Disewa') return false
-      const ret = new Date(t.return)
+      if (t.status !== 'Sedang Disewa' && t.status !== 'Booked') return false
+      const ret = parseDate(t.return)
+      if (!ret || isNaN(ret)) return false
       const retDay = new Date(ret.getFullYear(), ret.getMonth(), ret.getDate())
-      // tampilkan jika jatuh tempo hari ini atau besok (H-1)
       return retDay >= today && retDay < dayAfter
     })
   })()
 
-  const activeTx = transactions.filter(t => t.status === 'Sedang Disewa')
+  const activeTx = transactions.filter(t => t.status === 'Sedang Disewa' || t.status === 'Booked')
 
   const todayRevenue = transactions
     .filter(t => t.status !== 'Booked')
