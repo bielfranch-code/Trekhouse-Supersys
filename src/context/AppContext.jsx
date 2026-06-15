@@ -142,7 +142,10 @@ export function AppProvider({ children }) {
         if (eventType === 'DELETE') setItems(prev => prev.filter(i => i.id !== old.id))
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, ({ eventType, new: row, old }) => {
-        if (eventType === 'INSERT') setTransactions(prev => [dbToTx(row), ...prev])
+        if (eventType === 'INSERT') setTransactions(prev => {
+          const exists = prev.some(t => t.id === row.id)
+          return exists ? prev : [dbToTx(row), ...prev]
+        })
         if (eventType === 'UPDATE') setTransactions(prev => prev.map(t => t.id === row.id ? dbToTx(row) : t))
         if (eventType === 'DELETE') setTransactions(prev => prev.filter(t => t.id !== old.id))
       })
@@ -258,8 +261,13 @@ export function AppProvider({ children }) {
 
   // ── Transactions CRUD ──────────────────────────────────────────────────────
   const addTransaction = useCallback(async (tx) => {
-    const { error } = await supabase.from('transactions').insert([txToDb(tx)])
+    const { data, error } = await supabase.from('transactions').insert([txToDb(tx)]).select().single()
     if (error) { showToast('Gagal simpan transaksi: ' + error.message, 'error'); return false }
+    // Optimistic update — prepend immediately, realtime will dedup if it fires too
+    if (data) setTransactions(prev => {
+      const exists = prev.some(t => t.id === data.id)
+      return exists ? prev : [dbToTx(data), ...prev]
+    })
     // Also upsert customer record
     const existing = customers.find(c => c.phone.replace(/\D/g,'') === tx.phone.replace(/\D/g,''))
     if (existing) {
@@ -283,14 +291,16 @@ export function AppProvider({ children }) {
     const current = transactions.find(t => t.id === id)
     if (!current) return false
     const merged = { ...current, ...updates }
-    const { error } = await supabase.from('transactions').update(txToDb(merged)).eq('id', id)
+    const { data, error } = await supabase.from('transactions').update(txToDb(merged)).eq('id', id).select().single()
     if (error) { showToast('Gagal update transaksi: ' + error.message, 'error'); return false }
+    if (data) setTransactions(prev => prev.map(t => t.id === id ? dbToTx(data) : t))
     return true
   }, [transactions, showToast])
 
   const deleteTransaction = useCallback(async (id) => {
     const { error } = await supabase.from('transactions').delete().eq('id', id)
     if (error) { showToast('Gagal hapus transaksi: ' + error.message, 'error'); return false }
+    setTransactions(prev => prev.filter(t => t.id !== id))
     showToast(`Transaksi ${id} dihapus`, 'success')
     return true
   }, [showToast])

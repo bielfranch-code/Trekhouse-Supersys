@@ -237,14 +237,10 @@ export default function Transactions() {
                   <p className="text-sm text-amber-800">{selectedTx.returnNote}</p>
                 </div>
               )}
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <div className="bg-emerald-50 rounded-xl p-3 text-center">
                   <p className="text-xs text-emerald-600 mb-1">Subtotal</p>
                   <p className="font-bold text-emerald-800 text-sm">Rp {(selectedTx.subtotal||0).toLocaleString()}</p>
-                </div>
-                <div className="bg-blue-50 rounded-xl p-3 text-center">
-                  <p className="text-xs text-blue-600 mb-1">Deposit</p>
-                  <p className="font-bold text-blue-800 text-sm">Rp {Math.round((selectedTx.subtotal||0)*.3).toLocaleString()}</p>
                 </div>
                 <div className="bg-rose-50 rounded-xl p-3 text-center">
                   <p className="text-xs text-rose-600 mb-1">Denda</p>
