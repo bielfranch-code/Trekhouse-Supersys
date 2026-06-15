@@ -90,7 +90,7 @@ function ItemSearchRow({ ti, idx, items, getAvailableStock, onChangeItem, onChan
         className="w-14 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-center transition flex-shrink-0"
       />
       <span className="text-xs text-slate-500 w-20 text-right shrink-0 pt-1.5">
-        Rp {(ti.price * ti.qty * txDays).toLocaleString()}
+        Rp {(ti.price * ti.qty).toLocaleString()}
       </span>
       <button onClick={() => onRemove(idx)} className="p-1.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg flex-shrink-0">
         <i className="fas fa-times text-xs"></i>
@@ -113,8 +113,7 @@ export default function NewTxModal({ open, onClose, onSave }) {
     return d > 0 ? d : 1
   })()
 
-  const txSubtotal = form.items.reduce((s, i) => s + (i.price * i.qty * txDays), 0)
-  const txDeposit = Math.round(txSubtotal * 0.3)
+  const txSubtotal = form.items.reduce((s, i) => s + (i.price * i.qty), 0)
 
   function updateItemPrice(idx, itemId) {
     const found = items.find(i => i.id === +itemId)
@@ -144,7 +143,7 @@ export default function NewTxModal({ open, onClose, onSave }) {
       pickup: new Date(form.pickupDate).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}),
       return: new Date(form.returnDate).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}),
       items: itemNames, itemIds: validItems.map(i => +i.itemId), itemQtys: validItems.map(i => i.qty),
-      subtotal: txSubtotal + txDeposit, penalty: 0, status: 'Booked', returnNote: ''
+      subtotal: txSubtotal, penalty: 0, status: 'Booked', returnNote: ''
     }
     onSave(tx)
   }
@@ -224,10 +223,8 @@ export default function NewTxModal({ open, onClose, onSave }) {
 
           <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-4">
             <div className="flex justify-between text-xs mb-1.5"><span className="text-slate-500">Lama Sewa</span><span className="font-bold">{txDays} hari</span></div>
-            <div className="flex justify-between text-xs mb-1.5"><span className="text-slate-500">Subtotal Sewa</span><span className="font-bold">Rp {txSubtotal.toLocaleString()}</span></div>
-            <div className="flex justify-between text-xs mb-1.5"><span className="text-slate-500">Deposit (30%)</span><span className="font-bold">Rp {txDeposit.toLocaleString()}</span></div>
             <div className="flex justify-between text-sm font-extrabold border-t border-emerald-200 pt-2 mt-1">
-              <span>Total</span><span className="text-emerald-700">Rp {(txSubtotal + txDeposit).toLocaleString()}</span>
+              <span>Total</span><span className="text-emerald-700">Rp {txSubtotal.toLocaleString()}</span>
             </div>
           </div>
 
